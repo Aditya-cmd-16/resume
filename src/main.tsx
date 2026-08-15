@@ -5,6 +5,7 @@ import { AlertCircle, ArrowRight, BarChart3, BriefcaseBusiness, CheckCircle2, Ch
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import './styles.css'
 import './overrides.css'
+import './futuristic.css'
 
 type Report = {
   id: string; role: string; filename?: string; createdAt: string; overall: number; ats: number; keyword: number; impact: number; formatting: number
