@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const port = Number(process.env.PORT || 8787)
-const secret = process.env.SESSION_SECRET
+const isProduction = process.env.NODE_ENV === 'production'
+const secret = process.env.SESSION_SECRET || (isProduction ? '' : randomBytes(32).toString('base64url'))
 const openAiKey = process.env.OPENAI_API_KEY
 const openAiModel = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 if (!secret || secret.length < 32) throw new Error('Set SESSION_SECRET to a random value of at least 32 characters.')

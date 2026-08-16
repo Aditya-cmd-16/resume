@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "server": "node --env-file=.env server.mjs",
+    "dev": "concurrently --kill-others-on-fail --names api,client --prefix-colors blue,magenta \"npm:server\" \"npm:client\"",
+    "client": "vite",
+    "server": "node --env-file-if-exists=.env server.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
@@ -28,6 +29,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "concurrently": "^9.2.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
   }
