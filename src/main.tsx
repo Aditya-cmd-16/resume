@@ -1296,20 +1296,40 @@ function Reports() {
 
 function CareerRoadmap() {
   const reports = loadReports()
-  const initialRole = reports[0]?.role || 'Software Engineer'
+  const initialRole = reports[0]?.role || 'Full Stack Engineer'
   const [selectedRole, setSelectedRole] = useState(initialRole)
   const [customRoleInput, setCustomRoleInput] = useState('')
   const [roadmap, setRoadmap] = useState<CareerRoadmapData | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const quickRoles = [
+    { label: '🤖 AI / ML Engineer', role: 'AI & Machine Learning Engineer' },
+    { label: '⚡ Full Stack', role: 'Full Stack Engineer' },
+    { label: '🎨 Frontend', role: 'Frontend Engineer' },
+    { label: '⚙️ Backend Systems', role: 'Backend & Distributed Systems Engineer' },
+    { label: '☁️ Cloud & DevOps', role: 'DevOps & Platform Engineer' },
+    { label: '🛡️ Cybersecurity', role: 'Cybersecurity & AppSec Engineer' },
+    { label: '📊 Data Science', role: 'Data Scientist' },
+  ]
+
+  const storageKey = `resumeai-learned-skills-${selectedRole.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
   const [learnedSkills, setLearnedSkills] = useState<Record<string, boolean>>(() => {
     try {
-      return JSON.parse(localStorage.getItem('resumeai-learned-skills') || '{}')
+      return JSON.parse(localStorage.getItem(storageKey) || '{}')
     } catch {
       return {}
     }
   })
 
-  const currentReport = useMemo(() => reports.find(r => r.role.toLowerCase() === selectedRole.toLowerCase()) || reports[0], [reports, selectedRole])
+  useEffect(() => {
+    try {
+      setLearnedSkills(JSON.parse(localStorage.getItem(storageKey) || '{}'))
+    } catch {
+      setLearnedSkills({})
+    }
+  }, [storageKey])
+
+  const currentReport = useMemo(() => reports.find(r => r.role.toLowerCase() === selectedRole.toLowerCase()) || null, [reports, selectedRole])
 
   const fetchRoadmap = async (targetRole: string) => {
     setLoading(true)
@@ -1320,8 +1340,8 @@ function CareerRoadmap() {
         credentials: 'include',
         body: JSON.stringify({
           role: targetRole,
-          currentSkills: currentReport ? currentReport.matched : ['TypeScript', 'React', 'REST APIs', 'SQL'],
-          missingSkills: currentReport ? currentReport.missing : ['Microservices', 'Kubernetes', 'Redis Caching', 'System Design'],
+          currentSkills: currentReport ? currentReport.matched : [],
+          missingSkills: currentReport ? currentReport.missing : [],
         }),
       })
       if (response.ok) {
@@ -1339,7 +1359,7 @@ function CareerRoadmap() {
   const toggleSkill = (skillName: string) => {
     const updated = { ...learnedSkills, [skillName]: !learnedSkills[skillName] }
     setLearnedSkills(updated)
-    localStorage.setItem('resumeai-learned-skills', JSON.stringify(updated))
+    localStorage.setItem(storageKey, JSON.stringify(updated))
   }
 
   const allSkills = useMemo(() => {
@@ -1365,7 +1385,7 @@ function CareerRoadmap() {
       <div className="career-header-bar">
         <div>
           <span className="pill">
-            <TrendingUp /> AI Career Intelligence
+            <TrendingUp /> Dynamic Career Intelligence
           </span>
           <h2 style={{ margin: '8px 0 4px', fontSize: '24px' }}>Career Roadmap: {selectedRole}</h2>
           <p style={{ margin: 0, color: '#9cb0c7', fontSize: '13px' }}>
@@ -1388,13 +1408,45 @@ function CareerRoadmap() {
               type="text"
               value={customRoleInput}
               onChange={e => setCustomRoleInput(e.target.value)}
-              placeholder="Explore another role…"
+              placeholder="Explore custom role…"
             />
             <button className="primary-button" type="submit" style={{ padding: '8px 14px' }}>
               Explore
             </button>
           </form>
+          <button
+            className="download-button"
+            onClick={() => fetchRoadmap(selectedRole)}
+            disabled={loading}
+            title="Refresh Roadmap"
+            style={{ padding: '8px 12px' }}
+          >
+            <RefreshCw className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', margin: '4px 0 8px' }}>
+        <span style={{ fontSize: '11px', color: '#77eaff', fontWeight: 'bold', marginRight: '4px' }}>Quick Pathways:</span>
+        {quickRoles.map(qr => (
+          <button
+            key={qr.role}
+            onClick={() => setSelectedRole(qr.role)}
+            style={{
+              background: selectedRole === qr.role ? '#113554' : '#081729',
+              border: `1px solid ${selectedRole === qr.role ? '#64dcf5' : '#1f3c58'}`,
+              color: selectedRole === qr.role ? '#ffffff' : '#9bb0c7',
+              borderRadius: '20px',
+              padding: '5px 12px',
+              fontSize: '11px',
+              fontWeight: selectedRole === qr.role ? 'bold' : 'normal',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {qr.label}
+          </button>
+        ))}
       </div>
 
       {loading && <p className="muted" style={{ textAlign: 'center', padding: '40px' }}>Generating customized AI Career Roadmap for {selectedRole}…</p>}

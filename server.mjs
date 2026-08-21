@@ -174,14 +174,564 @@ const analyzeWithAI = async ({ resume, role, jobDescription, filename }) => {
   }
 }
 
-const buildHeuristicRoadmap = (role, currentSkills = [], missingSkills = []) => {
-  const normalizedRole = (role || 'Software Engineer').trim()
-  const current = currentSkills.slice(0, 10)
-  const missing = missingSkills.length ? missingSkills.slice(0, 8) : ['Cloud Architecture', 'Distributed Systems', 'CI/CD Pipelines', 'Performance Optimization']
+const domainRoadmaps = {
+  ai: {
+    matches: ['ai', 'machine learning', 'ml', 'deep learning', 'nlp', 'vision', 'data science', 'llm', 'genai', 'artificial intelligence', 'gpt'],
+    demandIndex: 'Explosive (Top 1% Growth)',
+    salaryRanges: { entry: '$105,000 – $135,000', mid: '$145,000 – $195,000', senior: '$210,000 – $320,000+' },
+    milestones: [
+      {
+        level: 'Level 1: AI/ML Foundations & Mathematical Modeling',
+        duration: '0 – 6 months',
+        objective: 'Master foundational ML algorithms, tensor mathematics, data preprocessing pipelines, and evaluation metrics.',
+        keyActions: [
+          'Solidify mastery in PyTorch/TensorFlow, NumPy, and vector embeddings.',
+          'Build end-to-end data ingestion, cleaning, and model evaluation pipelines with validation splits.',
+          'Deploy 2 production baseline models using FastAPI and Docker with sub-100ms inference.'
+        ],
+        targetDeliverables: 'Production ML pipeline with reproducible training, experiment tracking, and live API.'
+      },
+      {
+        level: 'Level 2: LLMs, Fine-Tuning & Advanced RAG Systems',
+        duration: '6 – 18 months',
+        objective: 'Architect enterprise Retrieval-Augmented Generation (RAG) and parameter-efficient fine-tuning (PEFT/LoRA).',
+        keyActions: [
+          'Implement hybrid vector search with Pinecone/Qdrant/Milvus, re-ranking, and context compression.',
+          'Fine-tune open-weight models (Llama 3, Mistral) using LoRA/QLoRA on specialized datasets.',
+          'Establish automated evaluation benchmarks (BLEU, ROUGE, BERTScore, G-Eval) and guardrails.'
+        ],
+        targetDeliverables: 'Enterprise RAG system with multi-stage retrieval, hallucination detection, and real-time response.'
+      },
+      {
+        level: 'Level 3: Distributed Training, MLOps & Autonomous Agents',
+        duration: '18 – 36 months',
+        objective: 'Lead large-scale distributed training, high-throughput inference optimization, and multi-agent systems.',
+        keyActions: [
+          'Implement high-throughput serving with vLLM, TensorRT-LLM, continuous batching, and quantization (AWQ/GPTQ).',
+          'Orchestrate distributed model training across multi-GPU clusters using DeepSpeed and FSDP.',
+          'Design autonomous multi-agent workflows with tool-calling, self-correction, and long-term memory.'
+        ],
+        targetDeliverables: 'Distributed multi-modal agentic platform handling 1M+ daily queries with enterprise safety.'
+      }
+    ],
+    skillMatrix: [
+      {
+        category: 'Core AI / ML Capabilities',
+        description: 'Non-negotiable foundations for modern AI/ML practitioners',
+        skills: [
+          { name: 'Python & PyTorch / JAX', status: 'learned', recommendedCourse: 'Deep Learning Specialization (Andrew Ng)' },
+          { name: 'Vector Databases (Pinecone, Qdrant)', status: 'learned', recommendedCourse: 'Vector Search & Embeddings in Production' },
+          { name: 'Data Wrangling & Feature Engineering', status: 'learned', recommendedCourse: 'High-Performance Data Pipelines with Polars' }
+        ]
+      },
+      {
+        category: 'LLM & Generative AI Gap Skills',
+        description: 'Cutting-edge industry requirements that unlock top tier interviews',
+        skills: [
+          { name: 'Advanced RAG & Hybrid Retrieval', status: 'gap', recommendedCourse: 'Enterprise RAG Architecture & Context Engineering' },
+          { name: 'Parameter-Efficient Fine-Tuning (LoRA/QLoRA)', status: 'gap', recommendedCourse: 'Fine-Tuning Open Source LLMs' },
+          { name: 'vLLM / TensorRT Inference Optimization', status: 'gap', recommendedCourse: 'Production LLM Serving & Model Compression' },
+          { name: 'Multi-Agent Frameworks (LangGraph, CrewAI)', status: 'gap', recommendedCourse: 'Building Autonomous Agentic Systems' }
+        ]
+      },
+      {
+        category: 'MLOps & Distributed Architecture',
+        description: 'Systems and orchestration skills for senior engineering leadership',
+        skills: [
+          { name: 'Distributed Training (DeepSpeed, FSDP)', status: 'recommended', recommendedCourse: 'Large Scale Distributed AI Systems' },
+          { name: 'Model Monitoring & Guardrails (NeMo, Guardrails AI)', status: 'recommended', recommendedCourse: 'Enterprise AI Safety & Evaluation' },
+          { name: 'Weights & Biases / MLflow Experiment Tracking', status: 'recommended', recommendedCourse: 'Full-Stack MLOps Engineering' }
+        ]
+      }
+    ],
+    projectBlueprints: [
+      {
+        id: 'proj-1',
+        title: 'Autonomous Multi-Agent Research Assistant with Hybrid RAG',
+        summary: 'A multi-agent research workflow that crawls, indexes, synthesizes, and cross-verifies complex technical documents with semantic chunking and citation tracking.',
+        techStack: ['PyTorch', 'LangGraph', 'Qdrant', 'FastAPI', 'Llama-3-70B'],
+        keyChallenges: [
+          'Eliminating hallucinations through multi-step agentic reflection and cross-document verification',
+          'Sub-300ms hybrid keyword + vector retrieval over 500,000 indexed documents'
+        ],
+        recruiterImpactMetric: 'Engineered multi-agent RAG pipeline delivering 94.2% factual precision with <450ms median latency'
+      },
+      {
+        id: 'proj-2',
+        title: 'High-Throughput Model Serving Engine with vLLM & Dynamic Batching',
+        summary: 'A production model inference gateway supporting continuous batching, PagedAttention, and AWQ 4-bit quantization.',
+        techStack: ['vLLM', 'Triton Inference Server', 'Docker', 'Kubernetes', 'Prometheus'],
+        keyChallenges: [
+          'Maximizing GPU memory utilization without KV-cache fragmentation during traffic spikes',
+          'Dynamic load-balancing across multi-GPU cluster with zero-downtime model hot-swaps'
+        ],
+        recruiterImpactMetric: 'Scaled LLM serving platform to 1,200 tokens/sec across 4x A100 GPUs, cutting compute costs by 62%'
+      },
+      {
+        id: 'proj-3',
+        title: 'Fine-Tuned Domain Specialist Model with Guardrails',
+        summary: 'Domain-adapted 8B foundation model fine-tuned on curated industry data with DPO alignment and real-time safety guardrails.',
+        techStack: ['Hugging Face', 'Unsloth', 'PyTorch', 'Weights & Biases', 'NeMo Guardrails'],
+        keyChallenges: [
+          'Preventing catastrophic forgetting while optimizing domain-specific reasoning benchmarks',
+          'Implementing real-time toxicity and prompt-injection defense with <15ms latency overhead'
+        ],
+        recruiterImpactMetric: 'Trained and aligned specialist LLM outperforming GPT-4 on domain benchmark while reducing latency by 4.8x'
+      }
+    ]
+  },
 
-  return {
-    role: normalizedRole,
+  frontend: {
+    matches: ['frontend', 'front-end', 'ui', 'ux', 'react', 'vue', 'angular', 'web developer', 'next.js', 'javascript developer'],
+    demandIndex: 'High',
+    salaryRanges: { entry: '$80,000 – $110,000', mid: '$115,000 – $155,000', senior: '$160,000 – $225,000+' },
+    milestones: [
+      {
+        level: 'Level 1: Modern Component Architecture & Type Safety',
+        duration: '0 – 6 months',
+        objective: 'Master modern React 19 / Next.js patterns, strict TypeScript, responsive layouts, and state management.',
+        keyActions: [
+          'Build responsive UI applications using Next.js App Router, TailwindCSS, and strict TypeScript.',
+          'Implement asynchronous data fetching and client caching with TanStack Query and Zustand.',
+          'Achieve 100% Core Web Vitals score and automated component testing with Vitest & Playwright.'
+        ],
+        targetDeliverables: 'Production-ready Next.js web application with 95+ Lighthouse score and comprehensive unit tests.'
+      },
+      {
+        level: 'Level 2: Web Performance, Design Systems & State Architecture',
+        duration: '6 – 18 months',
+        objective: 'Engineer scalable design systems, Core Web Vitals optimization (INP/LCP), and SSR/RSC architectures.',
+        keyActions: [
+          'Develop an enterprise component library with Storybook, accessibility (WCAG AAA), and automated visual regression.',
+          'Optimize Interaction to Next Paint (INP) and Largest Contentful Paint (LCP) through bundle analysis and code-splitting.',
+          'Implement offline-first client persistence with Service Workers and IndexedDB.'
+        ],
+        targetDeliverables: 'Accessible enterprise Design System published on NPM with automated visual testing pipeline.'
+      },
+      {
+        level: 'Level 3: Micro-Frontends, WebGL & Frontend Platform Leadership',
+        duration: '18 – 36 months',
+        objective: 'Architect micro-frontend platforms, real-time collaboration engines, and lead cross-team UI governance.',
+        keyActions: [
+          'Architect Module Federation / Micro-Frontend setup across multi-team monorepos using Turborepo.',
+          'Integrate real-time collaborative state using CRDTs (Yjs) and WebSockets with optimistic UI updates.',
+          'Establish organization-wide frontend performance budgets, CI/CD bundle size gates, and telemetry.'
+        ],
+        targetDeliverables: 'Multi-app micro-frontend platform with sub-second page transitions and real-time multiplayer editing.'
+      }
+    ],
+    skillMatrix: [
+      {
+        category: 'Core Frontend Competencies',
+        description: 'Foundational daily technologies for professional frontend developers',
+        skills: [
+          { name: 'React 19 & Next.js App Router', status: 'learned', recommendedCourse: 'Next.js Enterprise Architecture Masterclass' },
+          { name: 'TypeScript Strict Mode', status: 'learned', recommendedCourse: 'Advanced TypeScript Patterns (Matt Pocock)' },
+          { name: 'Tailwind CSS & CSS Grid Architecture', status: 'learned', recommendedCourse: 'Modern Responsive UI Systems' }
+        ]
+      },
+      {
+        category: 'High-Impact Gap Skills',
+        description: 'Advanced frontend skills that separate senior engineers in interviews',
+        skills: [
+          { name: 'Core Web Vitals & INP Optimization', status: 'gap', recommendedCourse: 'Web Performance Engineering & Profiling' },
+          { name: 'Design System Architecture (Storybook, Radix)', status: 'gap', recommendedCourse: 'Building Enterprise Design Systems' },
+          { name: 'End-to-End Testing (Playwright, MSW)', status: 'gap', recommendedCourse: 'Modern Frontend Testing Strategies' },
+          { name: 'Turborepo Monorepo Architecture', status: 'gap', recommendedCourse: 'Scalable Monorepo Engineering' }
+        ]
+      },
+      {
+        category: 'Advanced UI & Architecture',
+        description: 'Specialist capabilities for staff engineers and technical leads',
+        skills: [
+          { name: 'Real-Time CRDT Collaboration (Yjs, WebSockets)', status: 'recommended', recommendedCourse: 'Multiplayer Web Applications Architecture' },
+          { name: 'WebGL & Canvas 2D/3D Rendering (Three.js)', status: 'recommended', recommendedCourse: 'Interactive Graphics & Data Visualization' },
+          { name: 'Micro-Frontend Module Federation', status: 'recommended', recommendedCourse: 'Micro-Frontend Platform Patterns' }
+        ]
+      }
+    ],
+    projectBlueprints: [
+      {
+        id: 'proj-1',
+        title: 'Real-Time Collaborative Canvas & Document Studio',
+        summary: 'A multiplayer design workspace featuring conflict-free replicated data types (CRDTs), optimistic rendering, and infinite canvas.',
+        techStack: ['React', 'TypeScript', 'Yjs', 'Canvas API', 'WebSockets', 'Tailwind CSS'],
+        keyChallenges: [
+          'Smooth 60fps rendering of 10,000+ interactive canvas elements with spatial indexing',
+          'Zero-conflict real-time state synchronization across concurrent multi-user sessions'
+        ],
+        recruiterImpactMetric: 'Built real-time collaborative workspace supporting 50+ concurrent users with 60fps canvas performance'
+      },
+      {
+        id: 'proj-2',
+        title: 'Enterprise Headless Design System & Token Engine',
+        summary: 'An accessible, themeable UI library with 40+ atomic components, automated token pipelines from Figma, and visual regression tests.',
+        techStack: ['React', 'Radix UI', 'Storybook', 'Tailwind CSS', 'Playwright', 'Turborepo'],
+        keyChallenges: [
+          '100% WCAG 2.1 AAA keyboard and screen-reader accessibility compliance',
+          'Automated NPM publishing and visual diff testing on every pull request'
+        ],
+        recruiterImpactMetric: 'Engineered design system adopted across 8 applications, accelerating feature delivery by 45%'
+      },
+      {
+        id: 'proj-3',
+        title: 'High-Frequency Streaming Financial Analytics Dashboard',
+        summary: 'Real-time dashboard rendering live market tick streams with Web Workers, virtualized data tables, and interactive charts.',
+        techStack: ['Next.js', 'Web Workers', 'TanStack Virtual', 'ECharts', 'TypeScript'],
+        keyChallenges: [
+          'Decoupling high-frequency data ingestion from the React render cycle using off-thread Web Workers',
+          'Rendering 100,000+ live updated rows without UI thread stutter or frame drops'
+        ],
+        recruiterImpactMetric: 'Optimized web streaming dashboard handling 5,000 ticks/sec with zero frame drops (<16ms frame time)'
+      }
+    ]
+  },
+
+  backend: {
+    matches: ['backend', 'back-end', 'api', 'server', 'node', 'golang', 'go developer', 'java', 'spring', 'django', 'fastapi'],
     demandIndex: 'Very High',
+    salaryRanges: { entry: '$90,000 – $120,000', mid: '$125,000 – $170,000', senior: '$175,000 – $250,000+' },
+    milestones: [
+      {
+        level: 'Level 1: Robust API Design & Data Persistence',
+        duration: '0 – 6 months',
+        objective: 'Master REST/gRPC contracts, relational database schema design, index optimization, and connection pooling.',
+        keyActions: [
+          'Design type-safe APIs using gRPC/Protobuf and OpenAPI specs with input validation.',
+          'Optimize PostgreSQL queries, composite indices, and connection pooling with pgBouncer.',
+          'Build Dockerized microservice skeletons with health checks, structured logging, and unit test suites.'
+        ],
+        targetDeliverables: 'Production backend service with automated integration tests, DB migrations, and live deployment.'
+      },
+      {
+        level: 'Level 2: Distributed Caching, Queues & Event Streaming',
+        duration: '6 – 18 months',
+        objective: 'Implement asynchronous event-driven pipelines, Redis caching patterns, and transactional outbox patterns.',
+        keyActions: [
+          'Implement Kafka / RabbitMQ event streams with idempotent consumers and dead-letter queues.',
+          'Design multi-tier caching architectures with Redis Cluster and proactive cache invalidation.',
+          'Implement the Saga pattern and two-phase commit mechanisms for distributed workflows.'
+        ],
+        targetDeliverables: 'Event-driven streaming microservice pipeline handling 20k events/sec with zero data loss.'
+      },
+      {
+        level: 'Level 3: Multi-Region Resilience & High-Throughput Architecture',
+        duration: '18 – 36 months',
+        objective: 'Architect multi-region active-active distributed databases, consensus protocols, and enterprise reliability.',
+        keyActions: [
+          'Design distributed consensus protocols (Raft/Paxos) and write-ahead logging mechanisms.',
+          'Architect multi-region database replication with conflict resolution and automated disaster failover.',
+          'Establish distributed tracing with OpenTelemetry and automated SLA latency alerting.'
+        ],
+        targetDeliverables: 'High-availability distributed database cluster maintaining 99.999% uptime during network partitions.'
+      }
+    ],
+    skillMatrix: [
+      {
+        category: 'Core Backend Engineering',
+        description: 'Fundamental backend technologies for resilient API and service creation',
+        skills: [
+          { name: 'Go / Node.js / Python Backend', status: 'learned', recommendedCourse: 'High Performance Backend Engineering' },
+          { name: 'PostgreSQL & Database Indexing', status: 'learned', recommendedCourse: 'PostgreSQL Internals & Query Optimization' },
+          { name: 'Docker & Containerization', status: 'learned', recommendedCourse: 'Docker & Microservices in Production' }
+        ]
+      },
+      {
+        category: 'Distributed Systems Gap Skills',
+        description: 'Key distributed architecture competencies evaluated in senior interviews',
+        skills: [
+          { name: 'Apache Kafka Event Streaming', status: 'gap', recommendedCourse: 'Event-Driven Architectures with Kafka' },
+          { name: 'Redis Caching & Distributed Locks', status: 'gap', recommendedCourse: 'Redis at Scale: Caching & Concurrency' },
+          { name: 'gRPC & Protocol Buffers', status: 'gap', recommendedCourse: 'High-Throughput Microservice Interconnects' },
+          { name: 'OpenTelemetry Distributed Tracing', status: 'gap', recommendedCourse: 'Production Observability & SRE' }
+        ]
+      },
+      {
+        category: 'System Design & High Availability',
+        description: 'Staff-level design patterns for massive scalability and multi-region resilience',
+        skills: [
+          { name: 'Saga Pattern & Distributed Transactions', status: 'recommended', recommendedCourse: 'Designing Data-Intensive Applications' },
+          { name: 'Raft Consensus & Distributed Storage', status: 'recommended', recommendedCourse: 'Distributed Systems Implementation' },
+          { name: 'Rate Limiting & Token Bucket Algorithms', status: 'recommended', recommendedCourse: 'Building High-Traffic Gateways' }
+        ]
+      }
+    ],
+    projectBlueprints: [
+      {
+        id: 'proj-1',
+        title: 'Distributed Transaction Ledger with Event Sourcing',
+        summary: 'A financial accounting microservice utilizing event sourcing, transactional outbox pattern, and strict idempotency.',
+        techStack: ['Go', 'PostgreSQL', 'Kafka', 'Redis', 'Docker'],
+        keyChallenges: [
+          'Ensuring zero duplicate transactions across network retries with distributed idempotent keys',
+          'High-throughput state reconstruction from immutable event streams under 10ms'
+        ],
+        recruiterImpactMetric: 'Engineered ledger processing $50M/month in payments with 100% data auditability and zero double-spends'
+      },
+      {
+        id: 'proj-2',
+        title: 'High-Throughput Distributed Rate Limiter & Security Gateway',
+        summary: 'An API reverse proxy implementing sliding-window rate limiting, token buckets, and distributed Redis cluster synchronization.',
+        techStack: ['Node.js / Go', 'Redis Cluster', 'Docker', 'Prometheus', 'Grafana'],
+        keyChallenges: [
+          'Sub-3ms rate evaluation across 100,000 concurrent client IP addresses',
+          'Graceful degradation and local fallback during Redis cluster re-sharding'
+        ],
+        recruiterImpactMetric: 'Shielded backend services from 150k req/sec traffic spikes with <2ms proxy overhead'
+      },
+      {
+        id: 'proj-3',
+        title: 'Real-Time Telemetry & Metric Ingestion Pipeline',
+        summary: 'A time-series metric ingestion pipeline aggregating IoT and server logs into ClickHouse with real-time anomaly alerting.',
+        techStack: ['Go', 'ClickHouse', 'Kafka', 'gRPC', 'OpenTelemetry'],
+        keyChallenges: [
+          'Batching and columnar compression of 2 million metric events per minute',
+          'Real-time sliding window alert dispatch with dynamic threshold triggers'
+        ],
+        recruiterImpactMetric: 'Processed 3.5B monthly telemetry events with 99.99% ingestion reliability at 40% lower storage footprint'
+      }
+    ]
+  },
+
+  devops: {
+    matches: ['devops', 'cloud', 'sre', 'platform', 'infrastructure', 'kubernetes', 'k8s', 'terraform', 'aws', 'site reliability'],
+    demandIndex: 'Very High',
+    salaryRanges: { entry: '$95,000 – $125,000', mid: '$130,000 – $175,000', senior: '$180,000 – $260,000+' },
+    milestones: [
+      {
+        level: 'Level 1: Linux Internals, Containers & CI/CD Pipelines',
+        duration: '0 – 6 months',
+        objective: 'Master Linux systems programming, Docker image optimization, automated CI/CD, and cloud infrastructure basics.',
+        keyActions: [
+          'Configure multi-stage Docker builds reducing image sizes by >70% with non-root security.',
+          'Build end-to-end GitHub Actions / GitLab CI pipelines with automated linting, security scans, and deployment.',
+          'Provision cloud resources on AWS/GCP using Terraform modules.'
+        ],
+        targetDeliverables: 'Automated CI/CD pipeline provisioning zero-trust cloud infrastructure via Terraform.'
+      },
+      {
+        level: 'Level 2: Kubernetes Orchestration, GitOps & Observability',
+        duration: '6 – 18 months',
+        objective: 'Manage production Kubernetes clusters, GitOps continuous delivery (ArgoCD), and full-stack observability.',
+        keyActions: [
+          'Deploy and manage multi-node Kubernetes clusters with Helm charts and Ingress controllers.',
+          'Implement GitOps workflow with ArgoCD for automated declarative application deployments.',
+          'Configure Prometheus, Grafana, and Loki for cluster-wide metrics, logging, and SLA alerting.'
+        ],
+        targetDeliverables: 'Production Kubernetes cluster with automated GitOps deployments and full telemetry dashboards.'
+      },
+      {
+        level: 'Level 3: Platform Engineering, Service Mesh & Chaos Engineering',
+        duration: '18 – 36 months',
+        objective: 'Build Internal Developer Platforms (IDP), Service Mesh security (Istio), and multi-region disaster recovery.',
+        keyActions: [
+          'Implement Service Mesh (Istio) for mTLS encryption, canary traffic shifting, and circuit breaking.',
+          'Conduct chaos engineering experiments using Chaos Mesh / Litmus to validate automated failover.',
+          'Establish FinOps cloud cost optimization framework reducing monthly infrastructure spend.'
+        ],
+        targetDeliverables: 'Self-service Internal Developer Platform with automated mTLS, canary releases, and 99.99% SLA.'
+      }
+    ],
+    skillMatrix: [
+      {
+        category: 'Core Infrastructure Foundations',
+        description: 'Essential capabilities for cloud and infrastructure engineers',
+        skills: [
+          { name: 'Linux System Administration & Bash', status: 'learned', recommendedCourse: 'Linux Performance & Troubleshooting' },
+          { name: 'Terraform & Infrastructure as Code', status: 'learned', recommendedCourse: 'Production Terraform on AWS/GCP' },
+          { name: 'CI/CD Automation (GitHub Actions)', status: 'learned', recommendedCourse: 'Automated DevSecOps Pipelines' }
+        ]
+      },
+      {
+        category: 'Kubernetes & GitOps Gap Skills',
+        description: 'High-demand cloud-native skills required for top infrastructure roles',
+        skills: [
+          { name: 'Kubernetes Cluster Management & Helm', status: 'gap', recommendedCourse: 'Certified Kubernetes Administrator (CKA)' },
+          { name: 'ArgoCD / Flux GitOps Workflows', status: 'gap', recommendedCourse: 'GitOps in Enterprise Production' },
+          { name: 'Prometheus & Grafana Observability', status: 'gap', recommendedCourse: 'Site Reliability Engineering Monitoring' },
+          { name: 'Istio Service Mesh & mTLS', status: 'gap', recommendedCourse: 'Service Mesh Architecture' }
+        ]
+      },
+      {
+        category: 'Platform Engineering & SRE Leadership',
+        description: 'Advanced capabilities for staff infrastructure and platform engineers',
+        skills: [
+          { name: 'Internal Developer Platform (IDP) Design', status: 'recommended', recommendedCourse: 'Platform Engineering Fundamentals' },
+          { name: 'Chaos Engineering & Disaster Recovery', status: 'recommended', recommendedCourse: 'Resilience Testing & SRE' },
+          { name: 'FinOps Cloud Cost Optimization', status: 'recommended', recommendedCourse: 'Cloud Financial Management' }
+        ]
+      }
+    ],
+    projectBlueprints: [
+      {
+        id: 'proj-1',
+        title: 'GitOps Kubernetes Platform with Automated Canary Deployments',
+        summary: 'A declarative Kubernetes infrastructure managed via ArgoCD, Istio canary traffic splitting, and automated rollback on error spikes.',
+        techStack: ['Kubernetes', 'ArgoCD', 'Istio', 'Helm', 'Terraform', 'AWS EKS'],
+        keyChallenges: [
+          'Zero-downtime canary traffic migration based on Prometheus error rate telemetry',
+          'Automated drift detection and declarative sync across staging and production clusters'
+        ],
+        recruiterImpactMetric: 'Reduced deployment rollback time from 25 minutes to 30 seconds with 100% automated canary gating'
+      },
+      {
+        id: 'proj-2',
+        title: 'Multi-Tenant Cloud Infrastructure as Code Architecture',
+        summary: 'Modular Terraform framework provisioning isolated multi-account AWS VPCs, EKS clusters, and IAM least-privilege security.',
+        techStack: ['Terraform', 'AWS', 'Terragrunt', 'OpenTofu', 'TFLint'],
+        keyChallenges: [
+          'Strict isolation of production and staging network planes with automated security policy testing',
+          'Dynamic state locking and cross-region resource orchestration'
+        ],
+        recruiterImpactMetric: 'Provisioned enterprise cloud infrastructure supporting 15 microservices in <15 minutes with 100% IaC auditability'
+      },
+      {
+        id: 'proj-3',
+        title: 'Self-Healing Observability & Automated Incident Remediation',
+        summary: 'Cluster-wide Prometheus and OpenTelemetry stack triggering Kubernetes automated pod healing and webhook incident response.',
+        techStack: ['Prometheus', 'Grafana', 'Alertmanager', 'Python', 'Kubernetes API'],
+        keyChallenges: [
+          'Differentiating transient metric spikes from genuine memory leaks to prevent remediation thrashing',
+          'Real-time automated diagnostic dumps attached directly to PagerDuty alerts'
+        ],
+        recruiterImpactMetric: 'Automated 70% of routine infrastructure incidents, reducing Mean Time to Resolution (MTTR) by 58%'
+      }
+    ]
+  },
+
+  cybersecurity: {
+    matches: ['cyber', 'security', 'infosec', 'soc', 'penetration', 'pen tester', 'vulnerability', 'cryptography', 'security engineer'],
+    demandIndex: 'Critical (High Demand)',
+    salaryRanges: { entry: '$90,000 – $120,000', mid: '$130,000 – $175,000', senior: '$180,000 – $260,000+' },
+    milestones: [
+      {
+        level: 'Level 1: Network Security, Threat Analysis & Hardening',
+        duration: '0 – 6 months',
+        objective: 'Master network protocols, OWASP Top 10 vulnerabilities, Linux hardening, and SIEM monitoring.',
+        keyActions: [
+          'Perform vulnerability assessments using Burp Suite, Nmap, and Wireshark.',
+          'Implement system hardening benchmarks (CIS Benchmarks) on Linux and cloud hosts.',
+          'Analyze security logs and configure SIEM detection rules in Splunk/ELK.'
+        ],
+        targetDeliverables: 'Comprehensive vulnerability assessment report and hardened server baseline deployment.'
+      },
+      {
+        level: 'Level 2: AppSec, Threat Modeling & Cloud Security',
+        duration: '6 – 18 months',
+        objective: 'Implement automated DevSecOps CI/CD scanning, threat modeling (STRIDE), and cloud security posture (CSPM).',
+        keyActions: [
+          'Integrate SAST, DAST, and container vulnerability scanning into automated CI/CD pipelines.',
+          'Conduct architectural threat modeling for microservices using STRIDE methodology.',
+          'Remediate cloud misconfigurations across IAM, S3, and Kubernetes clusters.'
+        ],
+        targetDeliverables: 'Automated DevSecOps pipeline blocking critical vulnerabilities prior to production release.'
+      },
+      {
+        level: 'Level 3: Zero Trust Architecture, Red Teaming & Incident Response',
+        duration: '18 – 36 months',
+        objective: 'Lead enterprise zero trust network architecture, penetration testing, and incident response playbooks.',
+        keyActions: [
+          'Design and implement Zero Trust identity architecture with mutual TLS and fine-grained ABAC/RBAC.',
+          'Lead red team adversarial attack simulations and tabletop incident response exercises.',
+          'Automate security compliance reporting for SOC 2 Type II and ISO 27001 standards.'
+        ],
+        targetDeliverables: 'Enterprise Zero Trust security architecture specification and incident response playbook.'
+      }
+    ],
+    skillMatrix: [
+      {
+        category: 'Core Security Fundamentals',
+        description: 'Foundational capabilities for daily security analysis and mitigation',
+        skills: [
+          { name: 'OWASP Top 10 & Web Security', status: 'learned', recommendedCourse: 'Practical Web Application Penetration Testing' },
+          { name: 'Network Security & Protocol Analysis', status: 'learned', recommendedCourse: 'Wireshark & Network Defense' },
+          { name: 'Linux System Hardening (CIS)', status: 'learned', recommendedCourse: 'Enterprise Linux Security' }
+        ]
+      },
+      {
+        category: 'AppSec & Cloud Defense Gap Skills',
+        description: 'Advanced engineering skills evaluated in top corporate security roles',
+        skills: [
+          { name: 'DevSecOps & SAST/DAST Tooling (Snyk, Semgrep)', status: 'gap', recommendedCourse: 'Automated Application Security in CI/CD' },
+          { name: 'Threat Modeling (STRIDE, PASTA)', status: 'gap', recommendedCourse: 'Architectural Threat Modeling Masterclass' },
+          { name: 'Cloud Security Posture Management (CSPM)', status: 'gap', recommendedCourse: 'AWS/GCP Cloud Security Specialization' },
+          { name: 'Burp Suite Pro Web Exploitation', status: 'gap', recommendedCourse: 'Advanced Penetration Testing' }
+        ]
+      },
+      {
+        category: 'Zero Trust & Incident Response',
+        description: 'Senior leadership capabilities for enterprise security strategy',
+        skills: [
+          { name: 'Zero Trust Architecture Implementation', status: 'recommended', recommendedCourse: 'NIST Zero Trust Architecture' },
+          { name: 'Automated Incident Response (SOAR)', status: 'recommended', recommendedCourse: 'Security Operations & Incident Response' },
+          { name: 'SOC 2 / ISO 27001 Compliance Automation', status: 'recommended', recommendedCourse: 'Enterprise Compliance Engineering' }
+        ]
+      }
+    ],
+    projectBlueprints: [
+      {
+        id: 'proj-1',
+        title: 'Automated DevSecOps Security Scanner & CI/CD Gate',
+        summary: 'A continuous security scanning engine auditing pull requests for secrets, outdated dependencies, and AST-level code vulnerabilities.',
+        techStack: ['Python', 'Semgrep', 'Trivy', 'GitHub Actions', 'Docker'],
+        keyChallenges: [
+          'Minimizing developer friction by reducing false-positive alerts by >85%',
+          'Enforcing blocking gates on critical CVSS > 8.0 vulnerabilities with automated PR feedback'
+        ],
+        recruiterImpactMetric: 'Eliminated 100% of hardcoded secrets and blocked 42 high-severity vulnerabilities before merging'
+      },
+      {
+        id: 'proj-2',
+        title: 'Cloud Honeynet & Automated Threat Detection Sensor',
+        summary: 'A distributed decoy sensor network capturing real-time brute-force vectors and correlating attacks into SIEM dashboards.',
+        techStack: ['Python', 'AWS Lambda', 'Elasticsearch', 'Kibana', 'Docker'],
+        keyChallenges: [
+          'Real-time ingestion and threat intelligence mapping against MITRE ATT&CK framework',
+          'Automated IP blocklist dispatch to cloud firewalls upon detection of malicious probing'
+        ],
+        recruiterImpactMetric: 'Detected and neutralized 12,000+ malicious reconnaissance attempts with automated firewall blocking'
+      },
+      {
+        id: 'proj-3',
+        title: 'Zero Trust Microservice Identity & Authorization Gateway',
+        summary: 'A zero-trust access proxy enforcing SPIFFE/SPIRE cryptographic workload identities, mutual TLS, and attribute-based permissions.',
+        techStack: ['Go', 'SPIFFE/SPIRE', 'Envoy Proxy', 'mTLS', 'Open Policy Agent (OPA)'],
+        keyChallenges: [
+          'Enforcing sub-4ms fine-grained authorization checks per HTTP/gRPC request',
+          'Automated ephemeral cryptographic certificate rotation without connection dropping'
+        ],
+        recruiterImpactMetric: 'Implemented zero-trust workload identity reducing unauthorized internal lateral movement risk by 100%'
+      }
+    ]
+  }
+}
+
+const getDomainRoadmap = (targetRole, currentSkills = [], missingSkills = []) => {
+  const normalized = (targetRole || 'Software Engineer').toLowerCase()
+  for (const key of Object.keys(domainRoadmaps)) {
+    const isMatch = domainRoadmaps[key].matches.some(m => {
+      if (m.length <= 3) {
+        return new RegExp(`\\b${m}\\b`, 'i').test(normalized)
+      }
+      return normalized.includes(m)
+    })
+    if (isMatch) {
+      const template = domainRoadmaps[key]
+      return {
+        ...template,
+        role: targetRole.trim(),
+        milestones: template.milestones.map(m => ({
+          ...m,
+          objective: m.objective.replace(/Software Engineer/gi, targetRole.trim())
+        }))
+      }
+    }
+  }
+
+  // Dynamic fallback synthesized specifically from role title
+  return {
+    role: targetRole.trim(),
+    demandIndex: 'High Demand',
     salaryRanges: {
       entry: '$85,000 – $115,000',
       mid: '$120,000 – $165,000',
@@ -189,104 +739,108 @@ const buildHeuristicRoadmap = (role, currentSkills = [], missingSkills = []) => 
     },
     milestones: [
       {
-        level: 'Level 1: Core Foundation & Competency',
+        level: `Level 1: Core ${targetRole.trim()} Competency`,
         duration: '0 – 6 months',
-        objective: `Master fundamental patterns, key workflows, and core production practices for ${normalizedRole}.`,
+        objective: `Master fundamental tooling, workflows, and core production practices for ${targetRole.trim()}.`,
         keyActions: [
-          `Solidify mastery in ${current[0] || 'primary language'} and modern toolsets.`,
-          `Build 2 production-grade applications addressing real user problems with unit & integration tests.`,
-          `Implement automated testing and CI/CD pipelines to achieve >80% test coverage.`
+          `Build hands-on production competency in key industry standard tools for ${targetRole.trim()}.`,
+          `Develop 2 portfolio projects demonstrating end-to-end problem resolution and verified testing.`,
+          `Establish modern version control, documentation, and continuous delivery hygiene.`
         ],
-        targetDeliverables: 'Production portfolio application with clean documentation and live deployment.'
+        targetDeliverables: `Production portfolio project addressing key ${targetRole.trim()} requirements with live deployment.`
       },
       {
-        level: 'Level 2: Mid-Level Specialization & System Design',
+        level: `Level 2: Specialization & Scalable Execution`,
         duration: '6 – 18 months',
-        objective: `Expand into distributed architecture, performance tuning, and technical problem ownership.`,
+        objective: `Deepen architectural capabilities, performance tuning, and technical problem ownership.`,
         keyActions: [
-          `Integrate advanced competencies: ${missing.slice(0, 3).join(', ') || 'Distributed caching, database indexing, and observability'}.`,
-          `Design scalable APIs handling asynchronous workflows, rate limiting, and event queues.`,
-          `Contribute to open-source codebases or author comprehensive technical design RFCs.`
+          `Master advanced domain competencies: ${(missingSkills.slice(0, 3).join(', ')) || 'Architecture, optimization, and automation'}.`,
+          `Design scalable systems handling high-concurrency workflows and robust error recovery.`,
+          `Contribute to technical RFCs, peer code reviews, and industry best practices.`
         ],
-        targetDeliverables: 'End-to-end distributed system handling simulated high traffic with metrics monitoring.'
+        targetDeliverables: `Production-grade system showcasing advanced specialization and measurable business outcomes.`
       },
       {
-        level: 'Level 3: Senior Specialist & Technical Leadership',
+        level: `Level 3: Technical Leadership & Strategic Impact`,
         duration: '18 – 36 months',
-        objective: `Drive architecture strategy, cross-functional technical decisions, and engineer mentorship.`,
+        objective: `Drive cross-functional technical architecture, mentorship, and high-impact business initiatives.`,
         keyActions: [
-          `Lead technical RFCs for mission-critical services and multi-region resilience.`,
-          `Mentor junior and mid-level engineers through structured code reviews and knowledge sharing.`,
-          `Optimize cost, latency, and security across the entire application lifecycle.`
+          `Lead mission-critical system design and strategic technology selections.`,
+          `Mentor junior engineers through structured technical guidance and knowledge sharing.`,
+          `Optimize performance, security, and operational reliability across the entire project lifecycle.`
         ],
-        targetDeliverables: 'High-impact enterprise architecture blueprint and demonstrable team leadership records.'
+        targetDeliverables: `Enterprise architectural blueprint and demonstrable track record of leadership delivery.`
       }
     ],
     skillMatrix: [
       {
-        category: 'Core Competencies',
-        description: 'Non-negotiable foundational capabilities for daily engineering output',
-        skills: (current.length ? current : ['Modern JavaScript/TypeScript', 'API Design', 'Data Structures', 'Git Workflow']).map(s => ({
-          name: s,
+        category: `Core ${targetRole.trim()} Skills`,
+        description: `Fundamental daily requirements for ${targetRole.trim()}`,
+        skills: (currentSkills.length ? currentSkills.slice(0, 4) : ['Core Domain Tooling', 'System Architecture', 'Testing & Verification', 'Version Control']).map(s => ({
+          name: typeof s === 'string' ? s : 'Core Tool',
           status: 'learned',
-          recommendedCourse: 'Advanced Professional Certification & Practical Masterclass'
+          recommendedCourse: `Professional ${targetRole.trim()} Masterclass`
         }))
       },
       {
         category: 'High-Impact Gap Skills',
-        description: 'Key requirements detected in target roles that will unlock higher interview pass-rates',
-        skills: missing.map(s => ({
-          name: s,
+        description: 'Identified market requirements that elevate interview pass rates',
+        skills: (missingSkills.length ? missingSkills.slice(0, 4) : ['Advanced Architecture', 'System Optimization', 'Automated CI/CD', 'Security Best Practices']).map(s => ({
+          name: typeof s === 'string' ? s : 'Advanced Skill',
           status: 'gap',
-          recommendedCourse: `Mastering ${s}: Enterprise Best Practices and Architecture`
+          recommendedCourse: `Mastering ${s}: Enterprise Best Practices`
         }))
       },
       {
-        category: 'Architecture & Scaling',
-        description: 'System design patterns required for senior-level promotion and technical evaluation',
+        category: 'Scalability & Leadership',
+        description: 'Advanced capabilities for senior elevation and engineering leadership',
         skills: [
-          { name: 'System Design & Distributed Data', status: 'recommended', recommendedCourse: 'Designing Data-Intensive Applications Study' },
-          { name: 'Observability (Prometheus, OpenTelemetry)', status: 'recommended', recommendedCourse: 'Production Telemetry & Reliability' },
-          { name: 'Caching & Query Optimization', status: 'recommended', recommendedCourse: 'Database Internals & High-Throughput Caching' }
+          { name: 'System Design & Scalable Architecture', status: 'recommended', recommendedCourse: 'Designing High-Performance Systems' },
+          { name: 'Observability & Telemetry Monitoring', status: 'recommended', recommendedCourse: 'Production Reliability Engineering' },
+          { name: 'Cross-Functional Technical Leadership', status: 'recommended', recommendedCourse: 'Engineering Leadership & Strategic Execution' }
         ]
       }
     ],
     projectBlueprints: [
       {
         id: 'proj-1',
-        title: `Scalable ${normalizedRole} Core Platform`,
-        summary: 'A full-stack, cloud-native application featuring real-time processing and asynchronous task orchestration.',
-        techStack: ['TypeScript', 'Node.js', 'PostgreSQL', 'Redis', 'Docker'],
+        title: `Scalable ${targetRole.trim()} Production Platform`,
+        summary: `A full-stack, production-grade application demonstrating core execution, data flow, and modern architecture for ${targetRole.trim()}.`,
+        techStack: ['Modern Framework', 'Type-Safe Language', 'Database / Storage', 'Docker'],
         keyChallenges: [
-          'Handling concurrent data mutation with optimistic locking and distributed transactions',
-          'Implementing sub-50ms query caching with intelligent cache invalidation strategies'
+          'High-performance data handling with robust error recovery',
+          'Comprehensive automated testing suite with >80% code coverage'
         ],
-        recruiterImpactMetric: 'Built real-time processing engine supporting 50k concurrent requests with <45ms p99 latency'
+        recruiterImpactMetric: `Engineered core platform delivering 99.9% uptime and sub-50ms median response time`
       },
       {
         id: 'proj-2',
-        title: 'Event-Driven Microservices & Analytics Pipeline',
-        summary: 'An event-driven streaming pipeline ingesting high-throughput user activity with real-time aggregated dashboards.',
-        techStack: ['Kafka/RabbitMQ', 'Go / Python', 'ClickHouse / DynamoDB', 'Grafana'],
+        title: `Real-Time Event & Analytics Dashboard for ${targetRole.trim()}`,
+        summary: `A high-throughput monitoring and data visualization engine processing live metric streams with instant alerting.`,
+        techStack: ['Event Broker', 'Time-Series DB', 'Analytics Engine', 'Visualization UI'],
         keyChallenges: [
-          'Zero data loss queue processing with dead-letter queue recovery mechanism',
-          'Automated health checks, distributed tracing, and real-time SLA alert dispatch'
+          'Low-latency event processing during peak traffic spikes',
+          'Interactive, zero-lag data visualization across millions of records'
         ],
-        recruiterImpactMetric: 'Engineered analytics streaming pipeline processing 1.2M events/day with 99.99% uptime'
+        recruiterImpactMetric: `Built real-time pipeline processing 500k events/day with automated anomaly detection`
       },
       {
         id: 'proj-3',
-        title: 'Enterprise RBAC & Security Gateway',
-        summary: 'Secure OAuth2 / OIDC authentication gateway with fine-grained role-based permissions and rate limiting.',
-        techStack: ['Node.js / Go', 'JWT / Session Tokens', 'Redis Rate Limiter', 'Docker'],
+        title: `Enterprise Security & Workflow Automation Gateway`,
+        summary: `A secure, role-based workflow orchestrator ensuring zero-trust identity and automated task execution.`,
+        techStack: ['Security Layer', 'API Gateway', 'Authentication Protocols', 'CI/CD Pipeline'],
         keyChallenges: [
-          'Preventing timing attacks and brute-force vectors with token revocation lists',
-          'Edge caching of permission trees to reduce authorization latency to <5ms'
+          'Zero-trust permission enforcement with audit logging',
+          'Resilient task execution with automated failure retry loops'
         ],
-        recruiterImpactMetric: 'Implemented zero-trust security layer reducing unauthorized exploit surface by 100%'
+        recruiterImpactMetric: `Implemented automated workflow gateway reducing operational manual overhead by 65%`
       }
     ]
   }
+}
+
+const buildHeuristicRoadmap = (role, currentSkills = [], missingSkills = []) => {
+  return getDomainRoadmap(role, currentSkills, missingSkills)
 }
 
 const generateCareerRoadmap = async ({ role, currentSkills, missingSkills }) => {
@@ -298,7 +852,7 @@ Identified skill gaps: ${JSON.stringify(missingSkills || [])}
 Return valid JSON with this exact structure:
 {
   "role": "${role}",
-  "demandIndex": "High" | "Very High" | "Emerging",
+  "demandIndex": "High" | "Very High" | "Emerging" | "Explosive (Top 1% Growth)",
   "salaryRanges": { "entry": string, "mid": string, "senior": string },
   "milestones": [
     { "level": string, "duration": string, "objective": string, "keyActions": string[], "targetDeliverables": string }
