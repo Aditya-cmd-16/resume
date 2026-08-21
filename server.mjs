@@ -1,13 +1,25 @@
 import { createServer } from 'node:http'
 import { randomBytes, scryptSync, timingSafeEqual, createHash, createHmac, randomUUID } from 'node:crypto'
-import { mkdirSync, existsSync } from 'node:fs'
+import { mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-if (!process.env.SESSION_SECRET) {
+if (existsSync('.env')) {
   try {
-    if (typeof process.loadEnvFile === 'function' && existsSync('.env')) {
+    if (typeof process.loadEnvFile === 'function') {
       process.loadEnvFile('.env')
+    } else {
+      const envContent = readFileSync('.env', 'utf-8')
+      for (const line of envContent.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith('#')) continue
+        const idx = trimmed.indexOf('=')
+        if (idx > 0) {
+          const key = trimmed.slice(0, idx).trim()
+          const val = trimmed.slice(idx + 1).trim()
+          if (!process.env[key]) process.env[key] = val
+        }
+      }
     }
   } catch {}
 }
@@ -147,6 +159,390 @@ const analyzeWithAI = async ({ resume, role, jobDescription, filename }) => {
   }
 }
 
+const buildHeuristicRoadmap = (role, currentSkills = [], missingSkills = []) => {
+  const normalizedRole = (role || 'Software Engineer').trim()
+  const current = currentSkills.slice(0, 10)
+  const missing = missingSkills.length ? missingSkills.slice(0, 8) : ['Cloud Architecture', 'Distributed Systems', 'CI/CD Pipelines', 'Performance Optimization']
+
+  return {
+    role: normalizedRole,
+    demandIndex: 'Very High',
+    salaryRanges: {
+      entry: '$85,000 – $115,000',
+      mid: '$120,000 – $165,000',
+      senior: '$170,000 – $240,000+'
+    },
+    milestones: [
+      {
+        level: 'Level 1: Core Foundation & Competency',
+        duration: '0 – 6 months',
+        objective: `Master fundamental patterns, key workflows, and core production practices for ${normalizedRole}.`,
+        keyActions: [
+          `Solidify mastery in ${current[0] || 'primary language'} and modern toolsets.`,
+          `Build 2 production-grade applications addressing real user problems with unit & integration tests.`,
+          `Implement automated testing and CI/CD pipelines to achieve >80% test coverage.`
+        ],
+        targetDeliverables: 'Production portfolio application with clean documentation and live deployment.'
+      },
+      {
+        level: 'Level 2: Mid-Level Specialization & System Design',
+        duration: '6 – 18 months',
+        objective: `Expand into distributed architecture, performance tuning, and technical problem ownership.`,
+        keyActions: [
+          `Integrate advanced competencies: ${missing.slice(0, 3).join(', ') || 'Distributed caching, database indexing, and observability'}.`,
+          `Design scalable APIs handling asynchronous workflows, rate limiting, and event queues.`,
+          `Contribute to open-source codebases or author comprehensive technical design RFCs.`
+        ],
+        targetDeliverables: 'End-to-end distributed system handling simulated high traffic with metrics monitoring.'
+      },
+      {
+        level: 'Level 3: Senior Specialist & Technical Leadership',
+        duration: '18 – 36 months',
+        objective: `Drive architecture strategy, cross-functional technical decisions, and engineer mentorship.`,
+        keyActions: [
+          `Lead technical RFCs for mission-critical services and multi-region resilience.`,
+          `Mentor junior and mid-level engineers through structured code reviews and knowledge sharing.`,
+          `Optimize cost, latency, and security across the entire application lifecycle.`
+        ],
+        targetDeliverables: 'High-impact enterprise architecture blueprint and demonstrable team leadership records.'
+      }
+    ],
+    skillMatrix: [
+      {
+        category: 'Core Competencies',
+        description: 'Non-negotiable foundational capabilities for daily engineering output',
+        skills: (current.length ? current : ['Modern JavaScript/TypeScript', 'API Design', 'Data Structures', 'Git Workflow']).map(s => ({
+          name: s,
+          status: 'learned',
+          recommendedCourse: 'Advanced Professional Certification & Practical Masterclass'
+        }))
+      },
+      {
+        category: 'High-Impact Gap Skills',
+        description: 'Key requirements detected in target roles that will unlock higher interview pass-rates',
+        skills: missing.map(s => ({
+          name: s,
+          status: 'gap',
+          recommendedCourse: `Mastering ${s}: Enterprise Best Practices and Architecture`
+        }))
+      },
+      {
+        category: 'Architecture & Scaling',
+        description: 'System design patterns required for senior-level promotion and technical evaluation',
+        skills: [
+          { name: 'System Design & Distributed Data', status: 'recommended', recommendedCourse: 'Designing Data-Intensive Applications Study' },
+          { name: 'Observability (Prometheus, OpenTelemetry)', status: 'recommended', recommendedCourse: 'Production Telemetry & Reliability' },
+          { name: 'Caching & Query Optimization', status: 'recommended', recommendedCourse: 'Database Internals & High-Throughput Caching' }
+        ]
+      }
+    ],
+    projectBlueprints: [
+      {
+        id: 'proj-1',
+        title: `Scalable ${normalizedRole} Core Platform`,
+        summary: 'A full-stack, cloud-native application featuring real-time processing and asynchronous task orchestration.',
+        techStack: ['TypeScript', 'Node.js', 'PostgreSQL', 'Redis', 'Docker'],
+        keyChallenges: [
+          'Handling concurrent data mutation with optimistic locking and distributed transactions',
+          'Implementing sub-50ms query caching with intelligent cache invalidation strategies'
+        ],
+        recruiterImpactMetric: 'Built real-time processing engine supporting 50k concurrent requests with <45ms p99 latency'
+      },
+      {
+        id: 'proj-2',
+        title: 'Event-Driven Microservices & Analytics Pipeline',
+        summary: 'An event-driven streaming pipeline ingesting high-throughput user activity with real-time aggregated dashboards.',
+        techStack: ['Kafka/RabbitMQ', 'Go / Python', 'ClickHouse / DynamoDB', 'Grafana'],
+        keyChallenges: [
+          'Zero data loss queue processing with dead-letter queue recovery mechanism',
+          'Automated health checks, distributed tracing, and real-time SLA alert dispatch'
+        ],
+        recruiterImpactMetric: 'Engineered analytics streaming pipeline processing 1.2M events/day with 99.99% uptime'
+      },
+      {
+        id: 'proj-3',
+        title: 'Enterprise RBAC & Security Gateway',
+        summary: 'Secure OAuth2 / OIDC authentication gateway with fine-grained role-based permissions and rate limiting.',
+        techStack: ['Node.js / Go', 'JWT / Session Tokens', 'Redis Rate Limiter', 'Docker'],
+        keyChallenges: [
+          'Preventing timing attacks and brute-force vectors with token revocation lists',
+          'Edge caching of permission trees to reduce authorization latency to <5ms'
+        ],
+        recruiterImpactMetric: 'Implemented zero-trust security layer reducing unauthorized exploit surface by 100%'
+      }
+    ]
+  }
+}
+
+const generateCareerRoadmap = async ({ role, currentSkills, missingSkills }) => {
+  if (!openAiKey) return buildHeuristicRoadmap(role, currentSkills, missingSkills)
+  const prompt = `You are an executive tech career coach. Create a comprehensive, realistic, and actionable career roadmap for a candidate targeting the role: "${role}".
+Candidate current strengths: ${JSON.stringify(currentSkills || [])}
+Identified skill gaps: ${JSON.stringify(missingSkills || [])}
+
+Return valid JSON with this exact structure:
+{
+  "role": "${role}",
+  "demandIndex": "High" | "Very High" | "Emerging",
+  "salaryRanges": { "entry": string, "mid": string, "senior": string },
+  "milestones": [
+    { "level": string, "duration": string, "objective": string, "keyActions": string[], "targetDeliverables": string }
+  ],
+  "skillMatrix": [
+    { "category": string, "description": string, "skills": [{ "name": string, "status": "learned" | "gap" | "recommended", "recommendedCourse": string }] }
+  ],
+  "projectBlueprints": [
+    { "id": string, "title": string, "summary": string, "techStack": string[], "keyChallenges": string[], "recruiterImpactMetric": string }
+  ]
+}
+Include exactly 3 milestones (Level 1, Level 2, Level 3), 3 skillMatrix categories, and 3 project blueprints. Do not include markdown code formatting.`
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: openAiModel,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You generate structured JSON career roadmaps.' },
+          { role: 'user', content: prompt }
+        ]
+      })
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data?.error?.message || 'OpenAI failed')
+    return JSON.parse(data?.choices?.[0]?.message?.content || '{}')
+  } catch {
+    return buildHeuristicRoadmap(role, currentSkills, missingSkills)
+  }
+}
+
+const buildHeuristicRewrites = (bullet, role = 'Software Engineer') => {
+  const clean = String(bullet || '').trim().replace(/^[•\-\*]\s*/, '')
+  const words = clean.split(' ')
+  const verb = words[0] || 'Engineered'
+  const rest = words.slice(1).join(' ') || 'core system modules'
+
+  return {
+    original: clean,
+    impactScore: { before: 48, after: 94 },
+    rewrites: [
+      {
+        style: 'Google XYZ Formula',
+        label: 'Accomplished [X] as measured by [Y] by doing [Z]',
+        text: `Accomplished 35% performance gain and 99.9% service reliability for ${role} workloads by engineering ${rest || 'scalable service architecture'} with automated CI/CD validation.`,
+        formula: 'Accomplished [Outcome] measured by [35% gain] by doing [Architecture Engineering]',
+        rationale: 'Demonstrates clear causation between engineering effort and business metric.'
+      },
+      {
+        style: 'Metrics & Business Impact',
+        label: 'Quantified Revenue & Latency Signals',
+        text: `Optimized critical ${rest} pipeline, reducing p99 latency by 42% (from 320ms to 185ms) and saving $14,000/mo in cloud infrastructure costs across 500k+ active users.`,
+        formula: 'Action + Measurable reduction in latency + Tangible cloud cost savings',
+        rationale: 'Recruiters and hiring managers prioritize engineers who save money and improve speed.'
+      },
+      {
+        style: 'Executive & Technical Leadership',
+        label: 'Ownership, RFCs & Cross-Team Impact',
+        text: `Spearheaded end-to-end technical strategy for ${rest}, authoring architecture RFCs, aligning 4 cross-functional stakeholders, and mentoring 3 junior engineers on production best practices.`,
+        formula: 'Ownership + Architectural RFCs + Stakeholder Alignment + Mentorship',
+        rationale: 'Demonstrates senior-level maturity, communication skills, and leadership capacity.'
+      },
+      {
+        style: 'ATS Keyword Optimized',
+        label: 'High-Density Keyword Match',
+        text: `Architected and deployed enterprise ${rest} leveraging modern design patterns, containerization, distributed caching, and automated integration testing to ensure zero-downtime releases.`,
+        formula: 'High-signal technical keywords + Containerization + Distributed Systems',
+        rationale: 'Maximizes relevance score in automated Applicant Tracking Systems.'
+      }
+    ]
+  }
+}
+
+const rewriteBulletAI = async ({ bullet, role }) => {
+  if (!bullet || typeof bullet !== 'string') throw new Error('Bullet point text is required.')
+  if (!openAiKey) return buildHeuristicRewrites(bullet, role)
+
+  const prompt = `You are an elite tech resume writer who specializes in Google XYZ bullet formatting.
+Target Role: ${role || 'Software Engineer'}
+Input Bullet: "${bullet}"
+
+Rewrite this bullet into 4 high-impact variations following this exact JSON shape:
+{
+  "original": "${bullet}",
+  "impactScore": { "before": 45, "after": 95 },
+  "rewrites": [
+    { "style": "Google XYZ Formula", "label": "Accomplished [X] measured by [Y] by doing [Z]", "text": string, "formula": string, "rationale": string },
+    { "style": "Metrics & Business Impact", "label": "Quantified Revenue & Latency Signals", "text": string, "formula": string, "rationale": string },
+    { "style": "Executive & Technical Leadership", "label": "Ownership, RFCs & Cross-Team Impact", "text": string, "formula": string, "rationale": string },
+    { "style": "ATS Keyword Optimized", "label": "High-Density Keyword Match", "text": string, "formula": string, "rationale": string }
+  ]
+}
+Ensure active power verbs, plausible quantified metrics placeholders ($k, %, ms), and no generic filler.`
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: openAiModel,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You produce powerful resume bullet rewrites in JSON.' },
+          { role: 'user', content: prompt }
+        ]
+      })
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data?.error?.message || 'OpenAI failed')
+    return JSON.parse(data?.choices?.[0]?.message?.content || '{}')
+  } catch {
+    return buildHeuristicRewrites(bullet, role)
+  }
+}
+
+const buildHeuristicCoverLetter = ({ role, company, strengths = [] }) => {
+  const targetCompany = company || 'your organization'
+  const targetRole = role || 'Software Engineer'
+  const topStrengths = strengths.slice(0, 3)
+
+  return {
+    coverLetter: `Dear Hiring Team at ${targetCompany},
+
+I am writing to express my strong enthusiasm for the ${targetRole} position at ${targetCompany}. With a proven background in delivering scalable software solutions, optimizing system reliability, and aligning technical execution with strategic goals, I am confident in my ability to make an immediate, meaningful impact on your team.
+
+Throughout my career, I have focused on engineering robust, high-performance systems and solving complex challenges. Specifically, ${topStrengths[0] || 'my experience in modern architecture and performance tuning'} has enabled me to consistently ship reliable features ahead of schedule. Furthermore, ${topStrengths[1] || 'my hands-on expertise with distributed workflows and automated testing'} ensures that the software I build is maintainable, secure, and ready for production scale.
+
+What excites me most about ${targetCompany} is your commitment to technical excellence and user impact. I thrive in collaborative environments where engineers take end-to-end ownership, challenge assumptions, and continually raise the technical bar.
+
+I would welcome the opportunity to discuss how my technical skills, proactive problem-solving mindset, and dedication to quality can support ${targetCompany}'s upcoming initiatives. Thank you for your time and consideration.
+
+Sincerely,
+Candidate`,
+    linkedInOutreach: `Hi [Name],
+
+I noticed ${targetCompany} is currently expanding its engineering team for the ${targetRole} role. 
+
+Given my background in ${topStrengths[0] || 'scalable systems'} and track record of delivering high-reliability production applications, I believe my experience aligns well with your team's roadmap.
+
+I would love to learn more about the team's current technical challenges and share how I could contribute. Would you be open to a brief 10-minute chat this week?
+
+Best regards,
+[Your Name]`,
+    keyHighlights: [
+      `Tailored alignment for ${targetRole} at ${targetCompany}`,
+      'Emphasizes end-to-end ownership, testing rigor, and measurable outcomes',
+      'Concise, recruiter-friendly tone designed for high response rates'
+    ]
+  }
+}
+
+const generateCoverLetterAI = async ({ role, company, jobDescription, resume, strengths }) => {
+  if (!openAiKey) return buildHeuristicCoverLetter({ role, company, strengths })
+
+  const prompt = `You are a career consultant. Write a customized, compelling Cover Letter and a LinkedIn Recruiter Outreach message.
+Target Role: ${role}
+Target Company: ${company || 'the hiring company'}
+Job Description: ${jobDescription || 'Not specified'}
+Candidate Strengths & Resume Excerpt: ${JSON.stringify(strengths || [])}
+
+Return valid JSON with this exact shape:
+{
+  "coverLetter": string (3-4 paragraphs, professional and convincing),
+  "linkedInOutreach": string (short, polite, 3 paragraphs max, high conversion rate),
+  "keyHighlights": string[] (3 bullet points explaining strategic hooks used)
+}`
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: openAiModel,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You produce tailored cover letters and recruiter outreach messages in JSON.' },
+          { role: 'user', content: prompt }
+        ]
+      })
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data?.error?.message || 'OpenAI failed')
+    return JSON.parse(data?.choices?.[0]?.message?.content || '{}')
+  } catch {
+    return buildHeuristicCoverLetter({ role, company, strengths })
+  }
+}
+
+const evaluateInterviewAnswerAI = async ({ question, answer, role }) => {
+  const cleanAnswer = String(answer || '').trim()
+  if (!cleanAnswer) throw new Error('Please provide an answer to evaluate.')
+
+  const words = cleanAnswer.split(/\s+/).length
+  const hasMetric = /(?:\d+|%|\$|reduced|increased|improved|delivered)/i.test(cleanAnswer)
+  const hasAction = /(?:implemented|built|led|designed|created|optimized|resolved)/i.test(cleanAnswer)
+
+  const defaultEval = {
+    overallScore: Math.min(95, Math.max(30, (words > 40 ? 50 : 25) + (hasMetric ? 25 : 0) + (hasAction ? 20 : 0))),
+    starBreakdown: {
+      situation: words > 15 ? 'Clearly stated initial context' : 'Needs more background details',
+      task: 'Identified core objective',
+      action: hasAction ? 'Strong active ownership verbs used' : 'Elaborate more on specific personal contributions',
+      result: hasMetric ? 'Includes measurable outcomes' : 'Missing quantifiable metric (e.g. % improvement, hours saved)'
+    },
+    strengths: [
+      hasAction ? 'Good use of action-oriented phrasing' : 'Direct response to the question topic',
+      words >= 30 ? 'Comprehensive context provided' : 'Succinct explanation'
+    ],
+    improvements: [
+      !hasMetric ? 'Quantify the outcome with honest metrics (e.g., latency reduction %, scale handled, users affected).' : 'Highlight what lessons were learned for future projects.',
+      'Frame the answer explicitly around Situation, Task, Action, and Result for recruiter clarity.'
+    ],
+    modelAnswer: `In my previous role as a ${role || 'Engineer'}, we faced a critical bottleneck where service response times degraded under peak load (Situation). My task was to isolate the root cause and restore p99 latency to under 100ms (Task). I profiled the database queries, introduced Redis multi-tier caching, and refactored batch mutations (Action). As a result, p99 latency dropped by 65% and API error rates decreased to zero during high-traffic events (Result).`
+  }
+
+  if (!openAiKey) return defaultEval
+
+  const prompt = `You are a senior tech hiring bar-raiser for the role "${role || 'Software Engineer'}".
+Evaluate this candidate's interview answer to the question:
+Question: "${question}"
+Candidate Answer: "${cleanAnswer}"
+
+Return valid JSON with this shape:
+{
+  "overallScore": number (0-100),
+  "starBreakdown": { "situation": string, "task": string, "action": string, "result": string },
+  "strengths": string[],
+  "improvements": string[],
+  "modelAnswer": string (exemplary STAR response)
+}`
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: openAiModel,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You evaluate STAR interview answers in JSON.' },
+          { role: 'user', content: prompt }
+        ]
+      })
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data?.error?.message || 'OpenAI failed')
+    return JSON.parse(data?.choices?.[0]?.message?.content || '{}')
+  } catch {
+    return defaultEval
+  }
+}
+
 createServer(async (req, res) => {
   try {
     if (req.method === 'OPTIONS') return json(res, 204, {})
@@ -203,6 +599,30 @@ createServer(async (req, res) => {
       return json(res, 200, { report })
     }
 
+    if (req.method === 'POST' && path === '/api/career/roadmap') {
+      const body = await readBody(req)
+      const roadmap = await generateCareerRoadmap(body)
+      return json(res, 200, { roadmap })
+    }
+
+    if (req.method === 'POST' && path === '/api/bullet/rewrite') {
+      const body = await readBody(req)
+      const result = await rewriteBulletAI(body)
+      return json(res, 200, result)
+    }
+
+    if (req.method === 'POST' && path === '/api/cover-letter/generate') {
+      const body = await readBody(req)
+      const result = await generateCoverLetterAI(body)
+      return json(res, 200, result)
+    }
+
+    if (req.method === 'POST' && path === '/api/interview/evaluate') {
+      const body = await readBody(req)
+      const result = await evaluateInterviewAnswerAI(body)
+      return json(res, 200, result)
+    }
+
     if (req.method === 'POST' && path === '/api/reports') {
       const { report } = await readBody(req)
       if (!report?.id || !report?.role) return json(res, 400, { error: 'Invalid report.' })
@@ -215,4 +635,5 @@ createServer(async (req, res) => {
     return json(res, 400, { error: error.message || 'Request failed' })
   }
 }).listen(port, () => console.log(`ResumeAI API listening on http://127.0.0.1:${port}`))
+
 

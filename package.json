@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --names api,client --prefix-colors blue,magenta \"npm:server\" \"npm:client\"",
     "client": "vite",
-    "server": "node --env-file-if-exists=.env server.mjs",
+    "server": "node server.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
