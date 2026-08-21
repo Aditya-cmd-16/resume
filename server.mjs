@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { randomBytes, scryptSync, timingSafeEqual, createHash, createHmac, randomUUID } from 'node:crypto'
-import { mkdirSync, existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, existsSync, readFileSync, statSync, createReadStream } from 'node:fs'
+import { join, extname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 if (existsSync('.env')) {
@@ -1184,6 +1184,26 @@ createServer(async (req, res) => {
     if (req.method === 'OPTIONS') return json(res, 204, {})
     const host = req.headers.host || '127.0.0.1'
     const path = new URL(req.url, `http://${host}`).pathname
+
+    if (req.method === 'GET' && !path.startsWith('/api')) {
+      const safePath = path === '/' ? '/index.html' : path
+      const filePath = join(process.cwd(), 'dist', safePath)
+      if (existsSync(filePath) && statSync(filePath).isFile()) {
+        const ext = extname(filePath)
+        const mimeTypes = {
+          '.html': 'text/html; charset=utf-8',
+          '.js': 'application/javascript; charset=utf-8',
+          '.css': 'text/css; charset=utf-8',
+          '.json': 'application/json',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.svg': 'image/svg+xml',
+          '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        }
+        res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' })
+        return createReadStream(filePath).pipe(res)
+      }
+    }
 
     if (req.method === 'GET' && path === '/api/auth/me') {
       const user = currentUser(req)

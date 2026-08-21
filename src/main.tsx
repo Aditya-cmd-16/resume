@@ -27,6 +27,7 @@ import {
   Sparkles,
   TrendingUp,
   Trophy,
+  Tv,
   Upload,
   UserRound,
   X,
@@ -387,6 +388,10 @@ function Shell({ children, user, onSignOut }: { children: React.ReactNode; user:
             <FileText />
             Reports
           </NavLink>
+          <a href="/presentation.html" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Tv style={{ width: '16px' }} />
+            Project Presentation
+          </a>
         </nav>
         <p className="sidebar-note">Factual, ATS-first feedback. Your text stays in this browser.</p>
         <div
