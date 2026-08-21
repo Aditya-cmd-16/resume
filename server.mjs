@@ -1197,8 +1197,7 @@ createServer(async (req, res) => {
           '.json': 'application/json',
           '.png': 'image/png',
           '.jpg': 'image/jpeg',
-          '.svg': 'image/svg+xml',
-          '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+          '.svg': 'image/svg+xml'
         }
         res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' })
         return createReadStream(filePath).pipe(res)
