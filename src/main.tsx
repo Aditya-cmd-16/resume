@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowRight,
@@ -14,7 +14,6 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Filter,
   Layers,
   LayoutDashboard,
   ListChecks,
@@ -25,7 +24,6 @@ import {
   ScanSearch,
   Send,
   Sparkles,
-  Target,
   TrendingUp,
   Trophy,
   Upload,
@@ -114,48 +112,6 @@ type StarEvaluation = {
   strengths: string[]
   improvements: string[]
   modelAnswer: string
-}
-
-type Toast = {
-  id: string
-  message: string
-  type?: 'success' | 'info' | 'warn'
-}
-
-let toastListener: ((toast: Toast) => void) | null = null
-export const notify = (message: string, type: 'success' | 'info' | 'warn' = 'success') => {
-  if (toastListener) {
-    toastListener({ id: Math.random().toString(36).slice(2), message, type })
-  }
-}
-
-function ToastContainer() {
-  const [toasts, setToasts] = useState<Toast[]>([])
-
-  useEffect(() => {
-    toastListener = (newToast: Toast) => {
-      setToasts(prev => [...prev.slice(-3), newToast])
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== newToast.id))
-      }, 3200)
-    }
-    return () => {
-      toastListener = null
-    }
-  }, [])
-
-  if (toasts.length === 0) return null
-
-  return (
-    <div className="toast-container">
-      {toasts.map(t => (
-        <div key={t.id} className="toast-item">
-          <CheckCircle2 />
-          <span>{t.message}</span>
-        </div>
-      ))}
-    </div>
-  )
 }
 
 const stopWords = new Set(
@@ -282,24 +238,13 @@ function loadReports(): Report[] {
 }
 
 function Shell({ children, user, onSignOut }: { children: React.ReactNode; user: string; onSignOut: () => void }) {
-  const location = useLocation()
-  const pageTitle = useMemo(() => {
-    if (location.pathname === '/') return 'Dashboard Overview'
-    if (location.pathname === '/analyze') return 'Resume Analysis'
-    if (location.pathname === '/rewrite') return 'AI Bullet Optimizer'
-    if (location.pathname === '/career') return 'Career Roadmap'
-    if (location.pathname.startsWith('/reports')) return 'ATS Reports Center'
-    return 'Workspace'
-  }, [location.pathname])
-
   return (
     <div className="app-shell">
-      <ToastContainer />
       <aside className="sidebar">
         <Link className="logo" to="/">
           <span>✦</span> ResumeAI
         </Link>
-        <p className="workspace">INTELLIGENCE SUITE</p>
+        <p className="workspace">WORKSPACE</p>
         <nav>
           <NavLink to="/" end>
             <LayoutDashboard />
@@ -319,10 +264,10 @@ function Shell({ children, user, onSignOut }: { children: React.ReactNode; user:
           </NavLink>
           <NavLink to="/reports">
             <FileText />
-            Reports Archive
+            Reports
           </NavLink>
         </nav>
-        <p className="sidebar-note">Evidence-based ATS & career intelligence. 100% private and protected.</p>
+        <p className="sidebar-note">Factual, ATS-first feedback. Your text stays in this browser.</p>
         <div className="account-row">
           <UserRound />
           <span>{user}</span>
@@ -334,15 +279,13 @@ function Shell({ children, user, onSignOut }: { children: React.ReactNode; user:
       <main className="content">
         <header>
           <div>
-            <p className="eyebrow">RESUMEAI • {pageTitle.toUpperCase()}</p>
-            <h1>{pageTitle}</h1>
+            <p className="eyebrow">CAREER INTELLIGENCE</p>
+            <h1>Make every application count.</h1>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Link className="primary-button" to="/analyze">
-              <Sparkles />
-              New Analysis
-            </Link>
-          </div>
+          <Link className="primary-button" to="/analyze">
+            <Sparkles />
+            New analysis
+          </Link>
         </header>
         {children}
       </main>
@@ -353,89 +296,41 @@ function Shell({ children, user, onSignOut }: { children: React.ReactNode; user:
 function Dashboard() {
   const reports = loadReports()
   const latest = reports[0]
-
   return (
     <>
-      <section className="hero-card">
-        <div>
-          <span className="pill">
-            <Sparkles /> Recruiter-Grade AI Suite
-          </span>
-          <h2>Build high-converting resumes & accelerated career roadmaps.</h2>
-          <p>
-            Review ATS compatibility, transform weak bullets into Google XYZ impact statements, and generate tailored 3-year
-            milestone roadmaps.
-          </p>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+      {!latest && (
+        <section className="hero-card">
+          <div>
+            <span className="pill">
+              <Sparkles /> ATS-ready feedback
+            </span>
+            <h2>Turn your experience into your next opportunity.</h2>
+            <p>
+              Paste your resume, add a job description, and get a factual recruiter-style review of relevance, impact,
+              keywords, and readability.
+            </p>
             <Link className="light-button" to="/analyze">
-              Start Analysis <ChevronRight />
-            </Link>
-            <Link className="primary-button" to="/rewrite" style={{ marginTop: '13px' }}>
-              <Zap /> Bullet Rewriter
+              Start an analysis <ChevronRight />
             </Link>
           </div>
-        </div>
-        <div className="hero-score">
-          <span>READINESS</span>
-          <strong>{latest ? `${latest.overall}%` : 'ATS'}</strong>
-          <small>{latest ? `${latest.role}` : 'Recruiter score'}</small>
-        </div>
-      </section>
-
-      <section className="quick-actions-grid">
-        <Link to="/analyze" className="quick-card">
-          <div className="quick-card-icon">
-            <ScanSearch />
+          <div className="hero-score">
+            <span>WHAT YOU GET</span>
+            <strong>ATS</strong>
+            <small>keyword and impact review</small>
           </div>
-          <div className="quick-card-info">
-            <b>Analyze Resume</b>
-            <span>Instant ATS score & gap review</span>
-          </div>
-        </Link>
-
-        <Link to="/rewrite" className="quick-card">
-          <div className="quick-card-icon">
-            <Sparkles />
-          </div>
-          <div className="quick-card-info">
-            <b>Google XYZ Rewriter</b>
-            <span>Transform bullets with metrics</span>
-          </div>
-        </Link>
-
-        <Link to="/career" className="quick-card">
-          <div className="quick-card-icon">
-            <TrendingUp />
-          </div>
-          <div className="quick-card-info">
-            <b>Career Roadmap</b>
-            <span>Milestones, skills & blueprints</span>
-          </div>
-        </Link>
-
-        <Link to="/reports" className="quick-card">
-          <div className="quick-card-icon">
-            <FileText />
-          </div>
-          <div className="quick-card-info">
-            <b>Saved Reports ({reports.length})</b>
-            <span>Compare target role profiles</span>
-          </div>
-        </Link>
-      </section>
-
+        </section>
+      )}
       <section className="metric-grid">
-        <Metric icon={<ScanSearch />} label="ATS compatibility" value={latest ? `${latest.ats}%` : '—'} detail="Structure + headings" />
-        <Metric icon={<ListChecks />} label="Keyword coverage" value={latest ? `${latest.keyword}%` : '—'} detail="Job description match" />
-        <Metric icon={<BarChart3 />} label="Impact signals" value={latest ? `${latest.impact}%` : '—'} detail="Quantified metrics & verbs" />
+        <Metric icon={<ScanSearch />} label="ATS compatibility" value={latest ? `${latest.ats}%` : '—'} detail="Structure + relevance" />
+        <Metric icon={<ListChecks />} label="Keyword coverage" value={latest ? `${latest.keyword}%` : '—'} detail="Against job description" />
+        <Metric icon={<BarChart3 />} label="Impact signals" value={latest ? `${latest.impact}%` : '—'} detail="Results and action verbs" />
       </section>
-
       {latest && (
         <section className="two-column">
           <div className="panel">
             <div className="panel-title">
               <div>
-                <p className="eyebrow">LATEST EVALUATION</p>
+                <p className="eyebrow">LATEST ANALYSIS</p>
                 <h3>{latest.role}</h3>
               </div>
               <Link to="/reports">
@@ -445,15 +340,15 @@ function Dashboard() {
             <ScoreChart report={latest} />
           </div>
           <div className="panel">
-            <p className="eyebrow">HIGH-IMPACT RECOMMENDATIONS</p>
-            <h3>Priority Action Items</h3>
+            <p className="eyebrow">NEXT BEST ACTIONS</p>
+            <h3>Improve application readiness</h3>
             <ActionList items={latest.actions} />
-            <div style={{ display: 'flex', gap: '14px', marginTop: '18px' }}>
+            <div style={{ display: 'flex', gap: '16px', marginTop: '14px' }}>
               <Link className="text-link" to="/rewrite">
-                <Sparkles style={{ width: '13px' }} /> Optimize Bullets <ChevronRight />
+                AI Bullet Rewriter <ChevronRight />
               </Link>
               <Link className="text-link" to="/career">
-                <TrendingUp style={{ width: '13px' }} /> View Roadmap <ChevronRight />
+                Career Roadmap <ChevronRight />
               </Link>
             </div>
           </div>
@@ -529,7 +424,6 @@ function Analyze() {
       file.text().then(setText)
       setPreview('')
       setError('')
-      notify(`Loaded file: ${file.name}`)
     } else {
       setPreview('')
       setError('For reliable, factual analysis, paste the text from PDF/DOCX below. File parsing can be connected to a secure server later.')
@@ -576,7 +470,6 @@ function Analyze() {
       }
       const reports = loadReports()
       localStorage.setItem('resumeai-reports', JSON.stringify([report, ...reports.filter(r => r.id !== report.id)].slice(0, 10)))
-      notify('Resume analysis complete and saved!')
       navigate(`/reports/${report.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not analyze the resume')
@@ -587,15 +480,15 @@ function Analyze() {
   return (
     <section className="analysis-page">
       <div className="page-intro">
-        <p className="eyebrow">RECRUITER REVIEW ENGINE</p>
+        <p className="eyebrow">RESUME REVIEW</p>
         <h2>Get a recruiter-ready review.</h2>
-        <p>We evaluate strictly against provided content. Adding a job description enables precise keyword comparison.</p>
+        <p>We only evaluate information you provide. A job description enables a precise keyword comparison.</p>
       </div>
       <form className="analyze-form" onSubmit={submit}>
         <label className={`dropzone ${fileName ? 'has-file' : ''}`}>
           {preview ? <img className="file-preview" src={preview} alt="Attached resume preview" /> : <Upload />}
           <b>{fileName || 'Attach a resume file (optional)'}</b>
-          <span>TXT, PDF, DOCX, JPG, or JPEG. Paste resume text below for instant evaluation.</span>
+          <span>TXT, PDF, DOCX, JPG, or JPEG. Paste the resume text below for analysis.</span>
           <input type="file" accept=".txt,.pdf,.doc,.docx,.jpg,.jpeg,image/jpeg" onChange={fileChange} />
         </label>
         {error && (
@@ -608,34 +501,32 @@ function Analyze() {
           <label htmlFor="role">
             Target role <i>*</i>
           </label>
-          <input id="role" value={role} onChange={e => setRole(e.target.value)} placeholder="e.g., Senior Full Stack Engineer" required />
+          <input id="role" value={role} onChange={e => setRole(e.target.value)} placeholder="e.g., Data Analyst" required />
         </div>
         <div className="field">
-          <label htmlFor="resume" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Resume text <i>*</i></span>
-            <span style={{ color: '#7289a1', fontWeight: 'normal', fontSize: '11px' }}>{text.length} characters</span>
+          <label htmlFor="resume">
+            Resume text <i>*</i>
           </label>
-          <textarea id="resume" value={text} onChange={e => setText(e.target.value)} placeholder="Paste the complete text of your resume here…" rows={12} required />
+          <textarea id="resume" value={text} onChange={e => setText(e.target.value)} placeholder="Paste the complete text of your resume here…" rows={13} required />
         </div>
         <div className="field">
-          <label htmlFor="jd" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Job description <em>Optional but recommended</em></span>
-            <span style={{ color: '#7289a1', fontWeight: 'normal', fontSize: '11px' }}>{jd.length} characters</span>
+          <label htmlFor="jd">
+            Job description <em>Optional but recommended</em>
           </label>
-          <textarea id="jd" value={jd} onChange={e => setJd(e.target.value)} placeholder="Paste the target job description to identify matched and missing keywords." rows={6} />
+          <textarea id="jd" value={jd} onChange={e => setJd(e.target.value)} placeholder="Paste the target job description to identify matched and missing keywords." rows={7} />
         </div>
         <button className="primary-button submit" disabled={!text.trim() || !role.trim() || saving}>
           <Sparkles />
-          {saving ? 'Analyzing with AI Intelligence…' : 'Analyze My Resume'}
+          {saving ? 'Analyzing resume…' : 'Analyze my resume'}
         </button>
-        <p className="form-note">Reports are saved securely to your authenticated workspace.</p>
+        <p className="form-note">Reports are saved securely to your authenticated account.</p>
       </form>
     </section>
   )
 }
 
 function questions(report: Report, count: number, type: string) {
-  const subjects = report.matched.length ? report.matched : ['your primary engineering domain']
+  const subjects = report.matched.length ? report.matched : ['your most relevant skill']
   return Array.from({ length: count }, (_, i) => ({
     q: `${type}: How would you apply ${subjects[i % subjects.length]} in a ${report.role} situation?`,
     a: 'Give a truthful STAR-structured answer: situation, your specific action, result, and what you learned. Do not claim tools or outcomes that are not on your resume.',
@@ -667,7 +558,6 @@ function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => 
       })
       if (response.ok) {
         setResult(await response.json())
-        notify('Tailored cover letter & LinkedIn pitch generated!')
       }
     } catch {}
     setLoading(false)
@@ -686,7 +576,6 @@ function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => 
       setCopiedLetter(true)
       setTimeout(() => setCopiedLetter(false), 2000)
     }
-    notify(isLinkedIn ? 'LinkedIn pitch copied!' : 'Cover letter copied!')
   }
 
   const downloadText = () => {
@@ -699,7 +588,6 @@ function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => 
     a.download = `cover-letter-${report.role.toLowerCase().replace(/\s+/g, '-')}.txt`
     a.click()
     URL.revokeObjectURL(url)
-    notify('Downloaded outreach package!')
   }
 
   return (
@@ -724,7 +612,7 @@ function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => 
               type="text"
               value={company}
               onChange={e => setCompany(e.target.value)}
-              placeholder="e.g., Stripe, Google, Apple"
+              placeholder="e.g., Stripe, Google, Acme Corp"
               style={{ background: '#05111e', border: '1px solid #203c58', borderRadius: '8px', padding: '8px 12px', color: '#e8f4fc', fontSize: '12px' }}
             />
           </label>
@@ -802,7 +690,6 @@ function StarPracticeModal({ question, role, onClose }: { question: string; role
       })
       if (res.ok) {
         setFeedback(await res.json())
-        notify('STAR Answer Evaluated!')
       }
     } catch {}
     setEvaluating(false)
@@ -909,7 +796,6 @@ function StarPracticeModal({ question, role, onClose }: { question: string; role
 }
 
 function ReportView({ report }: { report: Report }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'keywords' | 'actions' | 'interview'>('overview')
   const [showCoverLetterModal, setShowCoverLetterModal] = useState(false)
   const [practiceQuestion, setPracticeQuestion] = useState<string | null>(null)
 
@@ -946,7 +832,6 @@ function ReportView({ report }: { report: Report }) {
     a.download = `resumeai-report-${report.role.toLowerCase().replace(/\s+/g, '-')}.json`
     a.click()
     URL.revokeObjectURL(url)
-    notify('Downloaded JSON report!')
   }
 
   return (
@@ -957,10 +842,10 @@ function ReportView({ report }: { report: Report }) {
       <div className="report-header">
         <div>
           <span className="pill">
-            <CheckCircle2 /> Analysis Complete
+            <CheckCircle2 /> Analysis complete
           </span>
-          <h2>{report.role} Evaluation</h2>
-          <p>{report.filename || 'Pasted resume content'} · Analyzed on {report.createdAt}</p>
+          <h2>{report.role} analysis</h2>
+          <p>{report.filename || 'Pasted resume'} · {report.createdAt}</p>
         </div>
         <div className="report-actions">
           <button className="primary-button" onClick={() => setShowCoverLetterModal(true)} style={{ height: '36px', fontSize: '11px', padding: '0 14px' }}>
@@ -971,79 +856,58 @@ function ReportView({ report }: { report: Report }) {
           </button>
           <div className="score-circle">
             <strong>{report.overall}</strong>
-            <span>overall score</span>
+            <span>overall readiness</span>
           </div>
         </div>
       </div>
 
-      <div style={{ padding: '0 24px', background: 'rgba(7, 19, 36, 0.5)', borderBottom: '1px solid rgba(77, 186, 255, 0.15)' }}>
-        <div className="tab-nav-bar" style={{ margin: 0, padding: '12px 0 0', border: 0 }}>
-          <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-            <BarChart3 style={{ width: '14px' }} /> Overview & ATS Score
-          </button>
-          <button className={`tab-btn ${activeTab === 'keywords' ? 'active' : ''}`} onClick={() => setActiveTab('keywords')}>
-            <ListChecks style={{ width: '14px' }} /> Keyword Gap Matrix ({report.matched.length} matched, {report.missing.length} gaps)
-          </button>
-          <button className={`tab-btn ${activeTab === 'actions' ? 'active' : ''}`} onClick={() => setActiveTab('actions')}>
-            <Zap style={{ width: '14px' }} /> Action Plan & Rewrites
-          </button>
-          <button className={`tab-btn ${activeTab === 'interview' ? 'active' : ''}`} onClick={() => setActiveTab('interview')}>
-            <Trophy style={{ width: '14px' }} /> STAR Interview Simulator
-          </button>
+      <div className="report-grid">
+        <div className="panel">
+          <p className="eyebrow">STRENGTHS</p>
+          <ActionList items={report.strengths} />
         </div>
-      </div>
-
-      <div className="report-grid" style={{ padding: '24px' }}>
-        {activeTab === 'overview' && (
-          <>
-            <div className="panel">
-              <p className="eyebrow">KEY STRENGTHS</p>
-              <ActionList items={report.strengths} />
+        <div className="panel">
+          <p className="eyebrow">RECRUITER WATCHOUTS</p>
+          <ul className="actions concerns">
+            {report.concerns.map(x => (
+              <li key={x}>
+                <AlertCircle />
+                {x}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="panel wide">
+          <div className="panel-title">
+            <div>
+              <p className="eyebrow">ATS MATCHING</p>
+              <h3>{ranking} match · {report.ats}%</h3>
             </div>
-            <div className="panel">
-              <p className="eyebrow">RECRUITER WATCHOUTS</p>
-              <ul className="actions concerns">
-                {report.concerns.map(x => (
-                  <li key={x}>
-                    <AlertCircle />
-                    {x}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="panel wide">
-              <div className="panel-title">
-                <div>
-                  <p className="eyebrow">ATS SECTION READABILITY</p>
-                  <h3>{ranking} match · {report.ats}% ATS Score</h3>
-                </div>
-                <span className="score-badge">{report.keyword}% keyword coverage</span>
+            <span className="score-badge">{report.keyword}% keywords</span>
+          </div>
+          <p className="muted">
+            Score rationale: recognizable headings, job-description term coverage, and achievement-focused language. This is a decision aid, not a guarantee of shortlisting.
+          </p>
+          <div className="section-list">
+            {report.sections.map(s => (
+              <div key={s.name}>
+                <span className={s.status}>
+                  <CheckCircle2 />
+                </span>
+                <b>{s.name}</b>
+                <p>{s.note}</p>
               </div>
-              <p className="muted">
-                Score breakdown: standard headings, job-description term density, and quantified impact language.
-              </p>
-              <div className="section-list">
-                {report.sections.map(s => (
-                  <div key={s.name}>
-                    <span className={s.status}>
-                      <CheckCircle2 />
-                    </span>
-                    <b>{s.name}</b>
-                    <p>{s.note}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+            ))}
+          </div>
+        </div>
 
-        {activeTab === 'keywords' && (
-          <>
-            <div className="panel">
-              <p className="eyebrow">KEYWORD RATIO</p>
-              <ResponsiveContainer width="100%" height={170}>
+        <div className="panel">
+          <p className="eyebrow">KEYWORD + SKILLS GAP</p>
+          {report.matched.length || report.missing.length ? (
+            <>
+              <ResponsiveContainer width="100%" height={160}>
                 <PieChart>
-                  <Pie data={pie} dataKey="value" innerRadius={48} outerRadius={70} paddingAngle={4}>
+                  <Pie data={pie} dataKey="value" innerRadius={44} outerRadius={65} paddingAngle={4}>
                     {pie.map((_, i) => (
                       <Cell key={i} fill={i ? '#344967' : '#66e3b4'} />
                     ))}
@@ -1051,98 +915,96 @@ function ReportView({ report }: { report: Report }) {
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
-              <p className="muted" style={{ textAlign: 'center', margin: 0 }}>
-                {report.matched.length} Matched terms · {report.missing.length} Missing gaps
+              <p className="keyword-line">
+                <b>Matching skills:</b> {report.matched.join(', ') || 'No job description provided'}
               </p>
-            </div>
-            <div className="panel">
-              <p className="eyebrow">MATCHED SKILLS</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
-                {report.matched.length ? (
-                  report.matched.map((m, i) => (
-                    <span key={i} className="skill-badge-mastered">
-                      {m}
-                    </span>
-                  ))
-                ) : (
-                  <p className="muted">No job description provided</p>
-                )}
-              </div>
-              <p className="eyebrow" style={{ marginTop: '20px' }}>MISSING HIGH-SIGNAL TERMS</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
-                {report.missing.length ? (
-                  report.missing.map((m, i) => (
-                    <span key={i} className="skill-badge-gap">
-                      {m}
-                    </span>
-                  ))
-                ) : (
-                  <p className="muted">None detected</p>
-                )}
-              </div>
-            </div>
-          </>
-        )}
+              <p className="keyword-line">
+                <b>Must-have gaps to validate:</b> {report.missing.join(', ') || 'None detected'}
+              </p>
+            </>
+          ) : (
+            <p className="muted">Add a job description in the next analysis to compare skills and technologies.</p>
+          )}
+        </div>
 
-        {activeTab === 'actions' && (
-          <>
-            <div className="panel wide">
-              <p className="eyebrow">PRIORITY REVISION ROADMAP</p>
-              <h3>Steps to Increase Recruiter Callback Rate</h3>
-              <ActionList items={report.actions} />
-              <div style={{ marginTop: '20px', display: 'flex', gap: '14px' }}>
-                <Link className="primary-button" to="/rewrite">
-                  <Sparkles /> Open AI Bullet Rewriter <ArrowRight />
-                </Link>
-                <Link className="light-button" to="/career">
-                  <TrendingUp /> View Career Roadmap <ArrowRight />
-                </Link>
-              </div>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'interview' && (
-          <div className="panel wide advanced-output">
-            <div className="panel-title" style={{ marginBottom: '12px' }}>
-              <div>
-                <p className="eyebrow">AI INTERVIEW SIMULATOR</p>
-                <h3>Targeted STAR Interview Questions</h3>
-              </div>
-              <span className="pill">Click "Practice STAR" to test and get AI scores</span>
-            </div>
-            {[
-              ['Technical', 10],
-              ['HR', 5],
-              ['Behavioral', 5],
-              ['Project', 5],
-              ['Coding', 5],
-            ].map(([kind, count]) => (
-              <details key={String(kind)}>
-                <summary>
-                  {kind} Questions ({count})
-                </summary>
-                {questions(report, Number(count), String(kind)).map((item, idx) => (
-                  <article key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px' }}>
-                    <div>
-                      <b>{item.q}</b>
-                      <p>
-                        <span>{item.level}</span> {item.a}
-                      </p>
-                    </div>
-                    <button
-                      className="copy-btn"
-                      onClick={() => setPracticeQuestion(item.q)}
-                      style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-                    >
-                      <MessageSquare /> Practice STAR
-                    </button>
-                  </article>
-                ))}
-              </details>
-            ))}
+        <div className="panel">
+          <p className="eyebrow">RESUME IMPROVEMENT</p>
+          <ActionList items={report.actions} />
+          <div style={{ marginTop: '16px' }}>
+            <Link className="primary-button" to="/rewrite" style={{ fontSize: '11px', padding: '8px 14px' }}>
+              <Sparkles /> Rewrite Weak Bullets with AI <ArrowRight />
+            </Link>
           </div>
-        )}
+        </div>
+
+        <div className="panel wide">
+          <div className="panel-title">
+            <div>
+              <p className="eyebrow">CAREER ROADMAP SUMMARY</p>
+              <h3>Target Growth Path for {report.role}</h3>
+            </div>
+            <Link to="/career" className="text-link">
+              Open Full Interactive Roadmap <ChevronRight />
+            </Link>
+          </div>
+          <div className="mini-grid">
+            <article>
+              <b>Project evaluation</b>
+              <p>Difficulty: evidence-based. Industry relevance depends on target role. Include problem, stack, contribution, and verified metrics.</p>
+              <span>Project score: 3 Blueprints ready</span>
+            </article>
+            <article>
+              <b>Career recommendation</b>
+              <p>Current fit: {ranking.toLowerCase()} for {report.role}. Transition timeframe: 6–18 months for senior elevation.</p>
+              <span>Shortlisting probability: {Math.min(90, Math.max(15, report.overall - 5))}%</span>
+            </article>
+            <article>
+              <b>Learning roadmap</b>
+              <p>Must-have: validate the listed {report.missing.length || 0} gaps. Build role-relevant portfolio projects.</p>
+              <span>Interactive Skill Tracker available</span>
+            </article>
+          </div>
+        </div>
+
+        <div className="panel wide advanced-output">
+          <div className="panel-title" style={{ marginBottom: '12px' }}>
+            <div>
+              <p className="eyebrow">AI INTERVIEW SIMULATOR</p>
+              <h3>Targeted STAR Interview Questions</h3>
+            </div>
+            <span className="pill">Click any question to practice</span>
+          </div>
+          {[
+            ['Technical', 10],
+            ['HR', 5],
+            ['Behavioral', 5],
+            ['Project', 5],
+            ['Coding', 5],
+          ].map(([kind, count]) => (
+            <details key={String(kind)}>
+              <summary>
+                {kind} questions ({count})
+              </summary>
+              {questions(report, Number(count), String(kind)).map((item, idx) => (
+                <article key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px' }}>
+                  <div>
+                    <b>{item.q}</b>
+                    <p>
+                      <span>{item.level}</span> {item.a}
+                    </p>
+                  </div>
+                  <button
+                    className="copy-btn"
+                    onClick={() => setPracticeQuestion(item.q)}
+                    style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                  >
+                    <MessageSquare /> Practice STAR
+                  </button>
+                </article>
+              ))}
+            </details>
+          ))}
+        </div>
       </div>
     </section>
   )
@@ -1189,7 +1051,6 @@ function CareerRoadmap() {
   const [customRoleInput, setCustomRoleInput] = useState('')
   const [roadmap, setRoadmap] = useState<CareerRoadmapData | null>(null)
   const [loading, setLoading] = useState(false)
-  const [skillFilter, setSkillFilter] = useState<'all' | 'gaps' | 'mastered'>('all')
   const [learnedSkills, setLearnedSkills] = useState<Record<string, boolean>>(() => {
     try {
       return JSON.parse(localStorage.getItem('resumeai-learned-skills') || '{}')
@@ -1216,7 +1077,6 @@ function CareerRoadmap() {
       if (response.ok) {
         const data = await response.json()
         setRoadmap(data.roadmap)
-        notify(`Roadmap generated for ${targetRole}!`)
       }
     } catch {}
     setLoading(false)
@@ -1230,7 +1090,6 @@ function CareerRoadmap() {
     const updated = { ...learnedSkills, [skillName]: !learnedSkills[skillName] }
     setLearnedSkills(updated)
     localStorage.setItem('resumeai-learned-skills', JSON.stringify(updated))
-    notify(updated[skillName] ? `Marked "${skillName}" as Mastered!` : `Marked "${skillName}" as In-Progress`)
   }
 
   const allSkills = useMemo(() => {
@@ -1249,19 +1108,6 @@ function CareerRoadmap() {
     if (!customRoleInput.trim()) return
     setSelectedRole(customRoleInput.trim())
     setCustomRoleInput('')
-  }
-
-  const exportRoadmap = () => {
-    if (!roadmap) return
-    const content = JSON.stringify(roadmap, null, 2)
-    const blob = new Blob([content], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `career-roadmap-${selectedRole.toLowerCase().replace(/\s+/g, '-')}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    notify('Career roadmap exported as JSON!')
   }
 
   return (
@@ -1292,15 +1138,12 @@ function CareerRoadmap() {
               type="text"
               value={customRoleInput}
               onChange={e => setCustomRoleInput(e.target.value)}
-              placeholder="Explore custom role…"
+              placeholder="Explore another role…"
             />
             <button className="primary-button" type="submit" style={{ padding: '8px 14px' }}>
               Explore
             </button>
           </form>
-          <button className="download-button" onClick={exportRoadmap} title="Export Roadmap">
-            <Download /> Export
-          </button>
         </div>
       </div>
 
@@ -1372,18 +1215,8 @@ function CareerRoadmap() {
                 <p className="eyebrow">INTERACTIVE SKILL MATRIX</p>
                 <h3>Competency & Gap Mastery Tracker</h3>
               </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <div className="tab-nav-bar" style={{ margin: 0, padding: 0, border: 0 }}>
-                  <button className={`tab-btn ${skillFilter === 'all' ? 'active' : ''}`} onClick={() => setSkillFilter('all')}>
-                    All ({allSkills.length})
-                  </button>
-                  <button className={`tab-btn ${skillFilter === 'gaps' ? 'active' : ''}`} onClick={() => setSkillFilter('gaps')}>
-                    Gaps to Learn
-                  </button>
-                  <button className={`tab-btn ${skillFilter === 'mastered' ? 'active' : ''}`} onClick={() => setSkillFilter('mastered')}>
-                    Mastered ({masteredCount})
-                  </button>
-                </div>
+              <div className="progress-text">
+                {masteredCount} / {allSkills.length} Skills Mastered ({progressPercent}%)
               </div>
             </div>
 
@@ -1391,48 +1224,37 @@ function CareerRoadmap() {
               <div className="progress-track">
                 <div className="progress-fill" style={{ width: `${progressPercent}%` }}></div>
               </div>
-              <span className="progress-text">{progressPercent}% Mastered</span>
             </div>
 
             <div className="skill-matrix-grid">
-              {roadmap.skillMatrix?.map((cat, idx) => {
-                const filteredSkills = cat.skills?.filter(s => {
-                  const isMastered = learnedSkills[s.name] || s.status === 'learned'
-                  if (skillFilter === 'gaps') return !isMastered
-                  if (skillFilter === 'mastered') return isMastered
-                  return true
-                })
-                if (!filteredSkills?.length && skillFilter !== 'all') return null
-
-                return (
-                  <div key={idx} className="skill-category-card">
-                    <h3>{cat.category}</h3>
-                    <p>{cat.description}</p>
-                    <ul className="skill-check-list">
-                      {filteredSkills?.map((s, i) => {
-                        const isChecked = learnedSkills[s.name] || s.status === 'learned'
-                        return (
-                          <li key={i} className={`skill-check-item ${isChecked ? 'completed' : ''}`}>
-                            <label className="skill-label">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleSkill(s.name)}
-                              />
-                              <span>{s.name}</span>
-                            </label>
-                            {s.status === 'gap' && !isChecked ? (
-                              <span className="skill-badge-gap">Gap</span>
-                            ) : (
-                              <span className="skill-badge-mastered">Mastered</span>
-                            )}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-                )
-              })}
+              {roadmap.skillMatrix?.map((cat, idx) => (
+                <div key={idx} className="skill-category-card">
+                  <h3>{cat.category}</h3>
+                  <p>{cat.description}</p>
+                  <ul className="skill-check-list">
+                    {cat.skills?.map((s, i) => {
+                      const isChecked = learnedSkills[s.name] || s.status === 'learned'
+                      return (
+                        <li key={i} className={`skill-check-item ${isChecked ? 'completed' : ''}`}>
+                          <label className="skill-label">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSkill(s.name)}
+                            />
+                            <span>{s.name}</span>
+                          </label>
+                          {s.status === 'gap' && !isChecked ? (
+                            <span className="skill-badge-gap">Gap</span>
+                          ) : (
+                            <span className="skill-badge-mastered">Mastered</span>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
             </div>
           </section>
 
@@ -1496,7 +1318,6 @@ function BulletRewriter() {
     'Optimized database queries and improved performance.',
     'Managed cloud infrastructure and deployed services to AWS.',
     'Led a team of 4 engineers and built REST API endpoints for user payments.',
-    'Trained computer vision models on custom dataset with PyTorch.',
   ]
 
   const handleRewrite = async (e?: FormEvent) => {
@@ -1512,7 +1333,6 @@ function BulletRewriter() {
       })
       if (response.ok) {
         setResult(await response.json())
-        notify('Generated 4 high-impact rewrites!')
       }
     } catch {}
     setLoading(false)
@@ -1522,7 +1342,6 @@ function BulletRewriter() {
     navigator.clipboard.writeText(text)
     setCopiedIndex(idx)
     setTimeout(() => setCopiedIndex(null), 2000)
-    notify('Bullet copied to clipboard!')
   }
 
   return (
@@ -1549,10 +1368,7 @@ function BulletRewriter() {
           </div>
 
           <div className="field">
-            <label htmlFor="rewriter-bullet" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Original Bullet Point</span>
-              <span style={{ color: '#7289a1', fontWeight: 'normal', fontSize: '11px' }}>{bullet.length} chars</span>
-            </label>
+            <label htmlFor="rewriter-bullet">Original Bullet Point</label>
             <textarea
               id="rewriter-bullet"
               value={bullet}
@@ -1575,14 +1391,14 @@ function BulletRewriter() {
                     background: '#0a1d30',
                     border: '1px solid #204162',
                     borderRadius: '6px',
-                    padding: '5px 9px',
+                    padding: '4px 8px',
                     color: '#9ceeff',
                     fontSize: '11px',
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
                 >
-                  "{sample.slice(0, 36)}…"
+                  "{sample.slice(0, 38)}…"
                 </button>
               ))}
             </div>
@@ -1619,9 +1435,9 @@ function BulletRewriter() {
               <div>
                 <b style={{ color: '#f0f8ff', fontSize: '13px' }}>Recruiter Impact Gain</b>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
-                  <span className="score-pill-before">Draft: {result.impactScore?.before || 48}%</span>
+                  <span className="score-pill-before">Draft: {result.impactScore?.before || 45}%</span>
                   <ArrowRight style={{ width: '14px', color: '#6ee7b7' }} />
-                  <span className="score-pill-after">Optimized: {result.impactScore?.after || 94}%</span>
+                  <span className="score-pill-after">Optimized: {result.impactScore?.after || 95}%</span>
                 </div>
               </div>
             </div>
@@ -1682,7 +1498,6 @@ function Auth({ mode, onSuccess }: { mode: 'login' | 'signup'; onSuccess: (email
       }
       if (!response.ok) throw new Error(data.error || 'Authentication failed')
       await onSuccess(data.user.email)
-      notify(mode === 'login' ? 'Signed in successfully!' : 'Account created!')
       nav('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
@@ -1776,7 +1591,6 @@ function App() {
     } catch {}
     localStorage.removeItem('resumeai-reports')
     setUser('')
-    notify('Signed out.')
   }
 
   if (checking)
