@@ -669,12 +669,24 @@ function questions(report: Report, count: number, type: string) {
 function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => void }) {
   const [company, setCompany] = useState('')
   const [tone, setTone] = useState<'professional' | 'technical' | 'executive'>('professional')
+  const [activeTab, setActiveTab] = useState<'letter' | 'linkedin' | 'highlights' | 'all'>('letter')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ coverLetter: string; linkedInOutreach: string; keyHighlights: string[] } | null>(null)
+  const [coverLetterText, setCoverLetterText] = useState('')
+  const [linkedInText, setLinkedInText] = useState('')
   const [copiedLetter, setCopiedLetter] = useState(false)
   const [copiedLinkedIn, setCopiedLinkedIn] = useState(false)
 
-  const generate = async () => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  const generate = async (e?: FormEvent) => {
+    if (e) e.preventDefault()
     setLoading(true)
     try {
       const response = await fetch('/api/cover-letter/generate', {
@@ -683,13 +695,17 @@ function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => 
         credentials: 'include',
         body: JSON.stringify({
           role: report.role,
-          company,
+          company: company.trim(),
+          tone,
           strengths: report.strengths,
           jobDescription: report.missing.join(', '),
         }),
       })
       if (response.ok) {
-        setResult(await response.json())
+        const data = await response.json()
+        setResult(data)
+        setCoverLetterText(data.coverLetter || '')
+        setLinkedInText(data.linkedInOutreach || '')
       }
     } catch {}
     setLoading(false)
@@ -710,14 +726,28 @@ function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => 
     }
   }
 
-  const downloadText = () => {
-    if (!result) return
-    const content = `COVER LETTER FOR ${report.role} AT ${company || 'TARGET COMPANY'}\n\n${result.coverLetter}\n\n-------------------------\nLINKEDIN OUTREACH MESSAGE\n\n${result.linkedInOutreach}`
-    const blob = new Blob([content], { type: 'text/plain' })
+  const downloadText = (type: 'all' | 'letter' | 'linkedin') => {
+    let content = ''
+    let filename = ''
+    const compName = company.trim() || 'target-company'
+    const roleSlug = report.role.toLowerCase().replace(/\s+/g, '-')
+
+    if (type === 'letter') {
+      content = coverLetterText
+      filename = `cover-letter-${roleSlug}-${compName.toLowerCase().replace(/\s+/g, '-')}.txt`
+    } else if (type === 'linkedin') {
+      content = linkedInText
+      filename = `linkedin-pitch-${roleSlug}.txt`
+    } else {
+      content = `========================================================\nCOVER LETTER FOR ${report.role.toUpperCase()} AT ${compName.toUpperCase()}\n========================================================\n\n${coverLetterText}\n\n========================================================\nLINKEDIN RECRUITER OUTREACH MESSAGE\n========================================================\n\n${linkedInText}\n\n========================================================\nSTRATEGIC VALUE HOOKS\n========================================================\n${result?.keyHighlights?.map((h, i) => `${i + 1}. ${h}`).join('\n') || ''}`
+      filename = `outreach-package-${roleSlug}.txt`
+    }
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `cover-letter-${report.role.toLowerCase().replace(/\s+/g, '-')}.txt`
+    a.download = filename
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -730,75 +760,163 @@ function CoverLetterModal({ report, onClose }: { report: Report; onClose: () => 
             <span className="pill">
               <Sparkles /> AI Outreach Generator
             </span>
-            <h3>Cover Letter & LinkedIn Pitch</h3>
+            <h3>Cover Letter & LinkedIn Pitch for {report.role}</h3>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={onClose} title="Close (Esc)">
             <X />
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr auto', gap: '12px', alignItems: 'end', marginBottom: '16px' }}>
+        <form onSubmit={generate} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr auto', gap: '12px', alignItems: 'end', marginBottom: '18px' }}>
           <label style={{ display: 'grid', gap: '5px', fontSize: '11px', color: '#9bb0c7', fontWeight: 'bold' }}>
             Target Company
             <input
               type="text"
               value={company}
               onChange={e => setCompany(e.target.value)}
-              placeholder="e.g., Stripe, Google, Acme Corp"
-              style={{ background: '#05111e', border: '1px solid #203c58', borderRadius: '8px', padding: '8px 12px', color: '#e8f4fc', fontSize: '12px' }}
+              placeholder="e.g., Stripe, Google, Apple"
+              style={{ background: '#05111e', border: '1px solid #203c58', borderRadius: '8px', padding: '9px 12px', color: '#e8f4fc', fontSize: '12.5px', outline: 'none' }}
             />
           </label>
           <label style={{ display: 'grid', gap: '5px', fontSize: '11px', color: '#9bb0c7', fontWeight: 'bold' }}>
-            Tone
+            Communication Tone
             <select
               value={tone}
               onChange={e => setTone(e.target.value as any)}
-              style={{ background: '#05111e', border: '1px solid #203c58', borderRadius: '8px', padding: '8px 12px', color: '#e8f4fc', fontSize: '12px' }}
+              style={{ background: '#05111e', border: '1px solid #203c58', borderRadius: '8px', padding: '9px 12px', color: '#e8f4fc', fontSize: '12.5px', outline: 'none' }}
             >
               <option value="professional">Professional & Impactful</option>
               <option value="technical">Direct & Technical</option>
               <option value="executive">Executive & Leadership</option>
             </select>
           </label>
-          <button className="primary-button" onClick={generate} disabled={loading} style={{ height: '36px', padding: '0 16px' }}>
+          <button className="primary-button" type="submit" disabled={loading} style={{ height: '38px', padding: '0 16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             <RefreshCw className={loading ? 'animate-spin' : ''} />
-            Regenerate
+            {loading ? 'Generating…' : 'Generate'}
+          </button>
+        </form>
+
+        <div className="modal-tab-bar">
+          <button className={`modal-tab-btn ${activeTab === 'letter' ? 'active' : ''}`} onClick={() => setActiveTab('letter')}>
+            <FileText style={{ width: '13px' }} /> Cover Letter
+          </button>
+          <button className={`modal-tab-btn ${activeTab === 'linkedin' ? 'active' : ''}`} onClick={() => setActiveTab('linkedin')}>
+            <MessageSquare style={{ width: '13px' }} /> LinkedIn Pitch
+          </button>
+          <button className={`modal-tab-btn ${activeTab === 'highlights' ? 'active' : ''}`} onClick={() => setActiveTab('highlights')}>
+            <CheckCircle2 style={{ width: '13px' }} /> Strategic Hooks
+          </button>
+          <button className={`modal-tab-btn ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
+            <Layers style={{ width: '13px' }} /> All Materials
           </button>
         </div>
 
-        {loading && <p className="muted" style={{ textAlign: 'center', padding: '30px' }}>Generating tailored outreach materials with AI…</p>}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <RefreshCw className="animate-spin" style={{ width: '32px', height: '32px', color: '#68e7f8', margin: '0 auto 12px' }} />
+            <p className="muted" style={{ margin: 0 }}>Synthesizing personalized outreach materials tailored for {company.trim() || 'your target role'}…</p>
+          </div>
+        )}
 
         {result && !loading && (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
-              <b style={{ color: '#68e6f7', fontSize: '13px' }}>Tailored Cover Letter</b>
-              <button className={`copy-btn ${copiedLetter ? 'copied' : ''}`} onClick={() => copy(result.coverLetter, false)}>
-                {copiedLetter ? <Check /> : <Copy />} {copiedLetter ? 'Copied!' : 'Copy Letter'}
-              </button>
-            </div>
-            <div className="letter-box">{result.coverLetter}</div>
+          <div>
+            {activeTab === 'letter' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#9bb0c7' }}>
+                    Editable Live Draft ({coverLetterText.split(/\s+/).filter(Boolean).length} words · {coverLetterText.length} chars)
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className={`copy-btn ${copiedLetter ? 'copied' : ''}`} onClick={() => copy(coverLetterText, false)}>
+                      {copiedLetter ? <Check /> : <Copy />} {copiedLetter ? 'Copied!' : 'Copy Letter'}
+                    </button>
+                    <button className="download-button" onClick={() => downloadText('letter')} style={{ padding: '5px 10px', fontSize: '11px' }}>
+                      <Download /> .TXT
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  className="letter-editor"
+                  value={coverLetterText}
+                  onChange={e => setCoverLetterText(e.target.value)}
+                  rows={11}
+                  placeholder="Cover letter draft…"
+                />
+              </div>
+            )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px' }}>
-              <b style={{ color: '#a58aff', fontSize: '13px' }}>LinkedIn Recruiter Cold Outreach Message</b>
-              <button className={`copy-btn ${copiedLinkedIn ? 'copied' : ''}`} onClick={() => copy(result.linkedInOutreach, true)}>
-                {copiedLinkedIn ? <Check /> : <Copy />} {copiedLinkedIn ? 'Copied!' : 'Copy Pitch'}
-              </button>
-            </div>
-            <div className="letter-box" style={{ maxHeight: '160px' }}>{result.linkedInOutreach}</div>
+            {activeTab === 'linkedin' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#9bb0c7' }}>
+                    LinkedIn Direct Message ({linkedInText.length} chars · Connection Note Ideal: &lt;300 chars)
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className={`copy-btn ${copiedLinkedIn ? 'copied' : ''}`} onClick={() => copy(linkedInText, true)}>
+                      {copiedLinkedIn ? <Check /> : <Copy />} {copiedLinkedIn ? 'Copied!' : 'Copy Pitch'}
+                    </button>
+                    <button className="download-button" onClick={() => downloadText('linkedin')} style={{ padding: '5px 10px', fontSize: '11px' }}>
+                      <Download /> .TXT
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  className="letter-editor"
+                  value={linkedInText}
+                  onChange={e => setLinkedInText(e.target.value)}
+                  rows={7}
+                  style={{ minHeight: '160px' }}
+                  placeholder="LinkedIn outreach message…"
+                />
+              </div>
+            )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {result.keyHighlights?.map((h, i) => (
-                  <li key={i} style={{ fontSize: '10px', color: '#76e6ba', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <CheckCircle2 style={{ width: '12px' }} /> {h}
-                  </li>
-                ))}
-              </ul>
-              <button className="download-button" onClick={downloadText}>
-                <Download /> Download All
-              </button>
-            </div>
-          </>
+            {activeTab === 'highlights' && (
+              <div style={{ background: '#05111e', border: '1px solid #1c3854', borderRadius: '10px', padding: '20px' }}>
+                <b style={{ color: '#68e7f8', fontSize: '13px', display: 'block', marginBottom: '12px' }}>
+                  Key Strategic Value Hooks Used:
+                </b>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '10px' }}>
+                  {result.keyHighlights?.map((h, i) => (
+                    <li key={i} style={{ fontSize: '12px', color: '#c2d5e8', display: 'flex', alignItems: 'flex-start', gap: '10px', lineHeight: 1.5 }}>
+                      <CheckCircle2 style={{ width: '16px', color: '#7bf2c3', flexShrink: 0, marginTop: '2px' }} />
+                      <span>{h}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {activeTab === 'all' && (
+              <div style={{ display: 'grid', gap: '18px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <b style={{ color: '#68e6f7', fontSize: '13px' }}>1. Cover Letter Draft</b>
+                    <button className={`copy-btn ${copiedLetter ? 'copied' : ''}`} onClick={() => copy(coverLetterText, false)}>
+                      {copiedLetter ? <Check /> : <Copy />} {copiedLetter ? 'Copied!' : 'Copy Letter'}
+                    </button>
+                  </div>
+                  <div className="letter-box" style={{ maxHeight: '200px' }}>{coverLetterText}</div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <b style={{ color: '#a58aff', fontSize: '13px' }}>2. LinkedIn Recruiter Pitch</b>
+                    <button className={`copy-btn ${copiedLinkedIn ? 'copied' : ''}`} onClick={() => copy(linkedInText, true)}>
+                      {copiedLinkedIn ? <Check /> : <Copy />} {copiedLinkedIn ? 'Copied!' : 'Copy Pitch'}
+                    </button>
+                  </div>
+                  <div className="letter-box" style={{ maxHeight: '140px' }}>{linkedInText}</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                  <button className="download-button" onClick={() => downloadText('all')}>
+                    <Download /> Download Complete Outreach Package
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -419,10 +419,76 @@ Ensure active power verbs, plausible quantified metrics placeholders ($k, %, ms)
   }
 }
 
-const buildHeuristicCoverLetter = ({ role, company, strengths = [] }) => {
+const buildHeuristicCoverLetter = ({ role, company, tone = 'professional', strengths = [] }) => {
   const targetCompany = company || 'your organization'
   const targetRole = role || 'Software Engineer'
   const topStrengths = strengths.slice(0, 3)
+
+  if (tone === 'technical') {
+    return {
+      coverLetter: `Dear Engineering Team at ${targetCompany},
+
+I am writing to apply for the ${targetRole} position at ${targetCompany}. With a deep background in designing resilient distributed systems, modern engineering workflows, and high-performance software architecture, I specialize in building maintainable, scalable infrastructure that solves high-complexity technical problems.
+
+In previous projects, I have focused heavily on system performance and reliability:
+- ${topStrengths[0] || 'Modern architecture and API design'} with end-to-end type safety and automated testing.
+- ${topStrengths[1] || 'Database query optimization and caching'} to achieve high concurrency and sub-50ms latency.
+- ${topStrengths[2] || 'CI/CD pipeline automation and Dockerized deployments'} ensuring zero-downtime releases.
+
+I admire ${targetCompany}'s technical rigor and engineering culture. I am eager to bring my architectural problem-solving capabilities and hands-on execution to your engineering roadmap.
+
+Thank you for your review.
+
+Best regards,
+Candidate`,
+      linkedInOutreach: `Hi [Name],
+
+I saw you're hiring for ${targetRole} at ${targetCompany}. Given my hands-on background in ${topStrengths[0] || 'scalable backend systems'} and performance optimization, I'm very interested in what the engineering team is building.
+
+Would you be open to connecting for a quick 5-minute chat about upcoming technical challenges?
+
+Best,
+[Your Name]`,
+      keyHighlights: [
+        `Direct, technical tone highlighting ${targetRole} competencies`,
+        'Demonstrates quantifiable architecture and scaling focus',
+        'Concise outreach message optimized for engineering hiring managers'
+      ]
+    }
+  }
+
+  if (tone === 'executive') {
+    return {
+      coverLetter: `Dear Leadership Team at ${targetCompany},
+
+I am writing to express my strong interest in the ${targetRole} role at ${targetCompany}. Throughout my career, I have operated at the intersection of technical excellence and strategic business impact—leading high-performing initiatives, fostering engineering best practices, and aligning product execution with organizational goals.
+
+Key value pillars I bring to ${targetCompany}:
+1. Proven Technical Delivery: ${topStrengths[0] || 'Championing scalable architectures that drive measurable business outcomes'}.
+2. Cross-Functional Collaboration: Translating complex technical requirements into clear deliverables across product, design, and operations.
+3. Quality & Velocity: ${topStrengths[1] || 'Instituting robust testing and observability to ensure long-term stability and velocity'}.
+
+${targetCompany}'s market vision and ambition resonate deeply with my approach to building enduring technological foundations. I welcome the opportunity to discuss how my experience and leadership can drive your strategic milestones.
+
+Sincerely,
+Candidate`,
+      linkedInOutreach: `Hello [Name],
+
+I've been following ${targetCompany}'s impressive growth and noticed your team is looking for a ${targetRole}. 
+
+Having led initiatives around ${topStrengths[0] || 'scalable platforms'} and high-velocity delivery, I'd welcome the chance to connect and discuss how I could support your strategic objectives.
+
+Would you be open to a brief introductory conversation this week?
+
+Warm regards,
+[Your Name]`,
+      keyHighlights: [
+        'Strategic leadership perspective focusing on business ROI and scalability',
+        'Emphasizes cross-functional execution and velocity',
+        'Professional executive outreach message'
+      ]
+    }
+  }
 
   return {
     coverLetter: `Dear Hiring Team at ${targetCompany},
@@ -439,11 +505,11 @@ Sincerely,
 Candidate`,
     linkedInOutreach: `Hi [Name],
 
-I noticed ${targetCompany} is currently expanding its engineering team for the ${targetRole} role. 
+I noticed ${targetCompany} is currently expanding its team for the ${targetRole} role. 
 
 Given my background in ${topStrengths[0] || 'scalable systems'} and track record of delivering high-reliability production applications, I believe my experience aligns well with your team's roadmap.
 
-I would love to learn more about the team's current technical challenges and share how I could contribute. Would you be open to a brief 10-minute chat this week?
+I would love to learn more about the team's current technical priorities and share how I could contribute. Would you be open to a brief 10-minute chat this week?
 
 Best regards,
 [Your Name]`,
@@ -455,19 +521,20 @@ Best regards,
   }
 }
 
-const generateCoverLetterAI = async ({ role, company, jobDescription, resume, strengths }) => {
-  if (!openAiKey) return buildHeuristicCoverLetter({ role, company, strengths })
+const generateCoverLetterAI = async ({ role, company, tone = 'professional', jobDescription, resume, strengths }) => {
+  if (!openAiKey) return buildHeuristicCoverLetter({ role, company, tone, strengths })
 
   const prompt = `You are a career consultant. Write a customized, compelling Cover Letter and a LinkedIn Recruiter Outreach message.
 Target Role: ${role}
 Target Company: ${company || 'the hiring company'}
+Selected Tone: ${tone} (e.g. professional, technical, or executive)
 Job Description: ${jobDescription || 'Not specified'}
 Candidate Strengths & Resume Excerpt: ${JSON.stringify(strengths || [])}
 
 Return valid JSON with this exact shape:
 {
-  "coverLetter": string (3-4 paragraphs, professional and convincing),
-  "linkedInOutreach": string (short, polite, 3 paragraphs max, high conversion rate),
+  "coverLetter": string (3-4 paragraphs, well-structured, convincing),
+  "linkedInOutreach": string (short, polite, high conversion rate connection note),
   "keyHighlights": string[] (3 bullet points explaining strategic hooks used)
 }`
 
@@ -489,7 +556,7 @@ Return valid JSON with this exact shape:
     if (!response.ok) throw new Error(data?.error?.message || 'OpenAI failed')
     return JSON.parse(data?.choices?.[0]?.message?.content || '{}')
   } catch {
-    return buildHeuristicCoverLetter({ role, company, strengths })
+    return buildHeuristicCoverLetter({ role, company, tone, strengths })
   }
 }
 
