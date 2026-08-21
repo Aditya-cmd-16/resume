@@ -40,8 +40,23 @@ db.exec(`PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS reports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sign_in_logs (id TEXT PRIMARY KEY, user_id TEXT, email TEXT NOT NULL, ip_address TEXT, user_agent TEXT, status TEXT NOT NULL, failure_reason TEXT, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
-CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id);`)
+CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_sign_in_logs_user ON sign_in_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_sign_in_logs_email ON sign_in_logs(email);
+CREATE INDEX IF NOT EXISTS idx_sign_in_logs_time ON sign_in_logs(created_at);`)
+
+const logSignIn = ({ userId = null, email, ip = '127.0.0.1', userAgent = 'Unknown', status, failureReason = null }) => {
+  try {
+    const id = randomUUID()
+    const createdAt = new Date().toISOString()
+    db.prepare('INSERT INTO sign_in_logs (id, user_id, email, ip_address, user_agent, status, failure_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, userId, email, ip, userAgent, status, failureReason, createdAt)
+  } catch (err) {
+    console.error('Failed to record sign-in log:', err.message)
+  }
+}
 
 const json = (res, status, body) => {
   res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
@@ -557,22 +572,30 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && (path === '/api/auth/signup' || path === '/api/auth/login')) {
       const { email, password } = await readBody(req)
       const cleanEmail = String(email || '').trim().toLowerCase()
+      const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '127.0.0.1'
+      const userAgent = req.headers['user-agent'] || 'Unknown'
+
       if (!/^\S+@\S+\.\S+$/.test(cleanEmail) || String(password || '').length < 8) {
+        logSignIn({ email: cleanEmail || 'unspecified', ip, userAgent, status: 'failed', failureReason: 'Validation error: invalid email or password under 8 characters' })
         return json(res, 400, { error: 'Use a valid email and a password of at least 8 characters.' })
       }
       let user
       if (path.endsWith('signup')) {
         if (db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail)) {
+          logSignIn({ email: cleanEmail, ip, userAgent, status: 'failed', failureReason: 'Account already exists' })
           return json(res, 409, { error: 'An account already exists for this email.' })
         }
         user = { id: randomUUID(), email: cleanEmail }
         db.prepare('INSERT INTO users VALUES (?, ?, ?, ?)').run(user.id, user.email, passwordHash(password), new Date().toISOString())
+        logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'signup' })
       } else {
         const row = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail)
         if (!row || !passwordMatches(password, row.password_hash)) {
+          logSignIn({ email: cleanEmail, ip, userAgent, status: 'failed', failureReason: 'Incorrect email or password' })
           return json(res, 401, { error: 'Incorrect email or password.' })
         }
         user = { id: row.id, email: row.email }
+        logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'success' })
       }
       setSession(res, user.id)
       return json(res, 200, { user })
@@ -588,6 +611,11 @@ createServer(async (req, res) => {
 
     const user = currentUser(req)
     if (!user) return json(res, 401, { error: 'Authentication required.' })
+
+    if (req.method === 'GET' && path === '/api/auth/sign-in-logs') {
+      const logs = db.prepare('SELECT id, user_id, email, ip_address, user_agent, status, failure_reason, created_at FROM sign_in_logs WHERE user_id = ? OR email = ? ORDER BY created_at DESC LIMIT 100').all(user.id, user.email)
+      return json(res, 200, { logs })
+    }
 
     if (req.method === 'GET' && path === '/api/reports') {
       const reports = db.prepare('SELECT payload FROM reports WHERE user_id = ? ORDER BY created_at DESC').all(user.id).map(row => JSON.parse(row.payload))

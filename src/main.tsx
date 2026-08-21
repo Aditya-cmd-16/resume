@@ -23,6 +23,7 @@ import {
   RotateCcw,
   ScanSearch,
   Send,
+  ShieldCheck,
   Sparkles,
   TrendingUp,
   Trophy,
@@ -35,6 +36,17 @@ import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis
 import './styles.css'
 import './overrides.css'
 import './futuristic.css'
+
+type SignInLog = {
+  id: string
+  user_id: string | null
+  email: string
+  ip_address: string
+  user_agent: string
+  status: string
+  failure_reason: string | null
+  created_at: string
+}
 
 type Report = {
   id: string
@@ -237,9 +249,118 @@ function loadReports(): Report[] {
   }
 }
 
+function SignInLogsModal({ onClose }: { onClose: () => void }) {
+  const [logs, setLogs] = useState<SignInLog[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/auth/sign-in-logs', { credentials: 'include' })
+      .then(res => (res.ok ? res.json() : { logs: [] }))
+      .then(data => {
+        setLogs(Array.isArray(data.logs) ? data.logs : [])
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const exportCSV = () => {
+    if (!logs.length) return
+    const headers = ['ID', 'Email', 'Status', 'IP Address', 'Timestamp', 'User Agent', 'Failure Reason']
+    const rows = logs.map(l => [
+      l.id,
+      l.email,
+      l.status,
+      l.ip_address,
+      l.created_at,
+      `"${(l.user_agent || '').replace(/"/g, '""')}"`,
+      `"${(l.failure_reason || '').replace(/"/g, '""')}"`,
+    ])
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sign-in-details-${Date.now()}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '850px' }}>
+        <div className="modal-header">
+          <div>
+            <span className="pill">
+              <ShieldCheck /> Security & Access Logs
+            </span>
+            <h3>Recorded Sign-In Details</h3>
+          </div>
+          <button className="close-btn" onClick={onClose}>
+            <X />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <p className="muted" style={{ margin: 0, fontSize: '12px' }}>
+            Every sign-in, signup, and login attempt is logged with IP, timestamp, and device metadata.
+          </p>
+          <button className="download-button" onClick={exportCSV} disabled={!logs.length}>
+            <Download /> Export CSV
+          </button>
+        </div>
+
+        {loading && <p className="muted" style={{ textAlign: 'center', padding: '30px' }}>Loading sign-in history…</p>}
+
+        {!loading && logs.length === 0 && (
+          <p className="muted" style={{ textAlign: 'center', padding: '30px' }}>No sign-in records found.</p>
+        )}
+
+        {!loading && logs.length > 0 && (
+          <div style={{ overflowX: 'auto', maxHeight: '420px', overflowY: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #204162', color: '#77eaff', textAlign: 'left' }}>
+                  <th style={{ padding: '10px 8px' }}>Status</th>
+                  <th style={{ padding: '10px 8px' }}>Email</th>
+                  <th style={{ padding: '10px 8px' }}>IP Address</th>
+                  <th style={{ padding: '10px 8px' }}>Date & Time</th>
+                  <th style={{ padding: '10px 8px' }}>Device / Browser</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map(log => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid #142a42' }}>
+                    <td style={{ padding: '10px 8px' }}>
+                      <span className={log.status === 'success' || log.status === 'signup' ? 'skill-badge-mastered' : 'skill-badge-gap'}>
+                        {log.status === 'signup' ? 'New Account' : log.status === 'success' ? 'Signed In' : 'Failed Attempt'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 8px', color: '#e8f4fc', fontWeight: 'bold' }}>{log.email}</td>
+                    <td style={{ padding: '10px 8px', color: '#8ea3ba', fontFamily: 'monospace' }}>{log.ip_address}</td>
+                    <td style={{ padding: '10px 8px', color: '#8ea3ba' }}>{new Date(log.created_at).toLocaleString()}</td>
+                    <td
+                      style={{ padding: '10px 8px', color: '#7189a1', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={log.user_agent}
+                    >
+                      {log.user_agent}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Shell({ children, user, onSignOut }: { children: React.ReactNode; user: string; onSignOut: () => void }) {
+  const [showSecurityLogs, setShowSecurityLogs] = useState(false)
+
   return (
     <div className="app-shell">
+      {showSecurityLogs && <SignInLogsModal onClose={() => setShowSecurityLogs(false)} />}
       <aside className="sidebar">
         <Link className="logo" to="/">
           <span>✦</span> ResumeAI
@@ -268,10 +389,21 @@ function Shell({ children, user, onSignOut }: { children: React.ReactNode; user:
           </NavLink>
         </nav>
         <p className="sidebar-note">Factual, ATS-first feedback. Your text stays in this browser.</p>
-        <div className="account-row">
-          <UserRound />
-          <span>{user}</span>
-          <button onClick={onSignOut} title="Sign out">
+        <div
+          className="account-row"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setShowSecurityLogs(true)}
+          title="Click to view all stored sign-in details & security history"
+        >
+          <ShieldCheck style={{ width: '16px', color: '#68e7f8', flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{user}</span>
+          <button
+            onClick={e => {
+              e.stopPropagation()
+              onSignOut()
+            }}
+            title="Sign out"
+          >
             <LogOut />
           </button>
         </div>
