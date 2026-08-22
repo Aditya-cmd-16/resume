@@ -110,12 +110,18 @@ const setSession = (res, user) => {
     exp: Date.now() + 1000 * 60 * 60 * 24 * 7
   })).toString('base64url')
   const signature = sign(payload)
+  const token = `${payload}.${signature}`
   const isProd = process.env.NODE_ENV === 'production'
-  res.setHeader('Set-Cookie', `resumeai_session=${encodeURIComponent(`${payload}.${signature}`)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${isProd ? '; Secure' : ''}`)
+  res.setHeader('Set-Cookie', `resumeai_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${isProd ? '; Secure' : ''}`)
+  return token
 }
 
 const currentUser = req => {
-  const rawCookie = cookies(req).resumeai_session
+  const authHeader = req.headers?.authorization || req.headers?.Authorization
+  const bearerToken = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : null
+  const rawCookie = bearerToken || cookies(req).resumeai_session
   if (!rawCookie) return null
   const decoded = safeDecode(rawCookie)
   const [payload, signature] = String(decoded || '').split('.')
@@ -1256,24 +1262,36 @@ export async function handleRequest(req, res) {
       }
       let user
       if (path.endsWith('signup')) {
-        if (db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail)) {
-          logSignIn({ email: cleanEmail, ip, userAgent, status: 'failed', failureReason: 'Account already exists' })
-          return json(res, 409, { error: 'An account already exists for this email.' })
+        const existing = db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(cleanEmail)
+        if (existing) {
+          if (passwordMatches(password, existing.password_hash)) {
+            user = { id: existing.id, email: cleanEmail }
+            logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'success' })
+          } else {
+            logSignIn({ email: cleanEmail, ip, userAgent, status: 'failed', failureReason: 'Account already exists' })
+            return json(res, 409, { error: 'An account already exists for this email. Please sign in.' })
+          }
+        } else {
+          user = { id: randomUUID(), email: cleanEmail }
+          db.prepare('INSERT INTO users VALUES (?, ?, ?, ?)').run(user.id, user.email, passwordHash(password), new Date().toISOString())
+          logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'signup' })
         }
-        user = { id: randomUUID(), email: cleanEmail }
-        db.prepare('INSERT INTO users VALUES (?, ?, ?, ?)').run(user.id, user.email, passwordHash(password), new Date().toISOString())
-        logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'signup' })
       } else {
         const row = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail)
-        if (!row || !passwordMatches(password, row.password_hash)) {
-          logSignIn({ email: cleanEmail, ip, userAgent, status: 'failed', failureReason: 'Incorrect email or password' })
-          return json(res, 401, { error: 'Incorrect email or password.' })
+        if (!row) {
+          user = { id: randomUUID(), email: cleanEmail }
+          db.prepare('INSERT INTO users VALUES (?, ?, ?, ?)').run(user.id, user.email, passwordHash(password), new Date().toISOString())
+          logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'success' })
+        } else if (!passwordMatches(password, row.password_hash)) {
+          logSignIn({ email: cleanEmail, ip, userAgent, status: 'failed', failureReason: 'Incorrect password' })
+          return json(res, 401, { error: 'Incorrect password. Please verify your password or create a new account.' })
+        } else {
+          user = { id: row.id, email: row.email }
+          logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'success' })
         }
-        user = { id: row.id, email: row.email }
-        logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'success' })
       }
-      setSession(res, user)
-      return json(res, 200, { user })
+      const token = setSession(res, user)
+      return json(res, 200, { user, token })
     }
 
     if (req.method === 'POST' && path === '/api/auth/logout') {

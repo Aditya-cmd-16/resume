@@ -254,7 +254,11 @@ function SignInLogsModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/auth/sign-in-logs', { credentials: 'include' })
+    const token = localStorage.getItem('resumeai_token')
+    fetch('/api/auth/sign-in-logs', {
+      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(res => (res.ok ? res.json() : { logs: [] }))
       .then(data => {
         setLogs(Array.isArray(data.logs) ? data.logs : [])
@@ -1794,6 +1798,12 @@ function Auth({ mode, onSuccess }: { mode: 'login' | 'signup'; onSuccess: (email
         throw new Error(`Server returned an invalid response (${response.status}). Please ensure the backend server is running.`)
       }
       if (!response.ok) throw new Error(data.error || 'Authentication failed')
+      if (data.token) {
+        localStorage.setItem('resumeai_token', data.token)
+      }
+      if (data.user?.email) {
+        localStorage.setItem('resumeai_user', data.user.email)
+      }
       await onSuccess(data.user.email)
       nav('/')
     } catch (err) {
@@ -1846,7 +1856,11 @@ function App() {
 
   const syncReports = async () => {
     try {
-      const response = await fetch('/api/reports', { credentials: 'include' })
+      const token = localStorage.getItem('resumeai_token')
+      const response = await fetch('/api/reports', {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
       if (response.ok) {
         const data = await response.json()
         if (Array.isArray(data.reports)) {
@@ -1859,15 +1873,20 @@ function App() {
   }
 
   useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' })
+    const token = localStorage.getItem('resumeai_token')
+    const savedUser = localStorage.getItem('resumeai_user') || ''
+    fetch('/api/auth/me', {
+      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(async response => {
         if (response.ok) {
           const data = await response.json()
           return data.user?.email || ''
         }
-        return ''
+        return savedUser
       })
-      .catch(() => '')
+      .catch(() => savedUser)
       .then(async email => {
         setUser(email)
         if (email) {
@@ -1884,8 +1903,15 @@ function App() {
 
   const signOut = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+      const token = localStorage.getItem('resumeai_token')
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
     } catch {}
+    localStorage.removeItem('resumeai_token')
+    localStorage.removeItem('resumeai_user')
     localStorage.removeItem('resumeai-reports')
     setUser('')
   }
