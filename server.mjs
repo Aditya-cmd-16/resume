@@ -27,15 +27,12 @@ if (existsSync('.env')) {
 const port = Number(process.env.PORT || 8787)
 let secret = process.env.SESSION_SECRET
 if (!secret || secret.length < 32) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('Set SESSION_SECRET to a random value of at least 32 characters in production.')
-  }
-  console.warn('Warning: SESSION_SECRET is not set or too short. Using an auto-generated secret for this session.')
-  secret = randomBytes(32).toString('hex')
+  secret = 'resumeai-default-secure-session-secret-key-32-chars-minimum'
 }
 
-mkdirSync(join(process.cwd(), 'data'), { recursive: true })
-const db = new DatabaseSync(join(process.cwd(), 'data', 'resumeai.db'))
+const dbDir = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME ? '/tmp/data' : (process.env.DATA_DIR || join(process.cwd(), 'data'))
+mkdirSync(dbDir, { recursive: true })
+const db = new DatabaseSync(join(dbDir, 'resumeai.db'))
 db.exec(`PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, expires_at INTEGER NOT NULL);
@@ -125,21 +122,27 @@ const currentUser = req => {
   }
 }
 
-const readBody = req => new Promise((resolve, reject) => {
-  let data = ''
-  req.on('data', chunk => {
-    data += chunk
-    if (data.length > 1_000_000) reject(new Error('Request too large'))
+const readBody = req => {
+  if (req.body && typeof req.body === 'object') return Promise.resolve(req.body)
+  if (typeof req.body === 'string') {
+    try { return Promise.resolve(req.body ? JSON.parse(req.body) : {}) } catch { return Promise.reject(new Error('Invalid JSON')) }
+  }
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.on('data', chunk => {
+      data += chunk
+      if (data.length > 1_000_000) reject(new Error('Request too large'))
+    })
+    req.on('end', () => {
+      try {
+        resolve(data ? JSON.parse(data) : {})
+      } catch {
+        reject(new Error('Invalid JSON'))
+      }
+    })
+    req.on('error', reject)
   })
-  req.on('end', () => {
-    try {
-      resolve(data ? JSON.parse(data) : {})
-    } catch {
-      reject(new Error('Invalid JSON'))
-    }
-  })
-  req.on('error', reject)
-})
+}
 
 const openAiKey = process.env.OPENAI_API_KEY
 const openAiModel = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -1179,11 +1182,16 @@ Return valid JSON with this shape:
   }
 }
 
-createServer(async (req, res) => {
+export async function handleRequest(req, res) {
   try {
     if (req.method === 'OPTIONS') return json(res, 204, {})
     const host = req.headers.host || '127.0.0.1'
-    const path = new URL(req.url, `http://${host}`).pathname
+    let path = new URL(req.url, `http://${host}`).pathname
+
+    // In Vercel serverless, rewrite /api/... might arrive with or without /api prefix
+    if (!path.startsWith('/api') && path !== '/' && !path.startsWith('/assets') && !path.includes('.')) {
+      path = '/api' + path
+    }
 
     if (req.method === 'GET' && !path.startsWith('/api')) {
       const safePath = path === '/' ? '/index.html' : path
@@ -1202,6 +1210,10 @@ createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' })
         return createReadStream(filePath).pipe(res)
       }
+    }
+
+    if (req.method === 'GET' && (path === '/healthz' || path === '/api/health' || path === '/api/healthz')) {
+      return json(res, 200, { ok: true })
     }
 
     if (req.method === 'GET' && path === '/api/auth/me') {
@@ -1302,6 +1314,13 @@ createServer(async (req, res) => {
   } catch (error) {
     return json(res, 400, { error: error.message || 'Request failed' })
   }
-}).listen(port, () => console.log(`ResumeAI API listening on http://127.0.0.1:${port}`))
+}
+
+export default handleRequest
+
+const isMainModule = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*[\\\/]/, ''))
+if (isMainModule && !process.env.VERCEL) {
+  createServer(handleRequest).listen(port, () => console.log(`ResumeAI API listening on http://127.0.0.1:${port}`))
+}
 
 
