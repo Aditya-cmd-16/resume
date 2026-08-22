@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQU
 CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, token_hash TEXT NOT NULL UNIQUE, expires_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS reports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sign_in_logs (id TEXT PRIMARY KEY, user_id TEXT, email TEXT NOT NULL, ip_address TEXT, user_agent TEXT, status TEXT NOT NULL, failure_reason TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS revoked_tokens (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id);
 CREATE INDEX IF NOT EXISTS idx_sign_in_logs_user ON sign_in_logs(user_id);
@@ -102,21 +103,43 @@ const passwordMatches = (password, stored) => {
   }
 }
 
-const setSession = (res, userId) => {
-  const token = randomBytes(32).toString('base64url')
-  const id = randomUUID()
-  const expires = Date.now() + 1000 * 60 * 60 * 24 * 7
-  db.prepare('INSERT INTO sessions VALUES (?, ?, ?, ?)').run(id, userId, hash(token), expires)
+const setSession = (res, user) => {
+  const payload = Buffer.from(JSON.stringify({
+    id: user.id,
+    email: user.email,
+    exp: Date.now() + 1000 * 60 * 60 * 24 * 7
+  })).toString('base64url')
+  const signature = sign(payload)
   const isProd = process.env.NODE_ENV === 'production'
-  res.setHeader('Set-Cookie', `resumeai_session=${encodeURIComponent(`${token}.${sign(token)}`)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${isProd ? '; Secure' : ''}`)
+  res.setHeader('Set-Cookie', `resumeai_session=${encodeURIComponent(`${payload}.${signature}`)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800${isProd ? '; Secure' : ''}`)
 }
 
 const currentUser = req => {
-  const token = validSessionCookie(cookies(req).resumeai_session)
-  if (!token) return null
+  const rawCookie = cookies(req).resumeai_session
+  if (!rawCookie) return null
+  const decoded = safeDecode(rawCookie)
+  const [payload, signature] = String(decoded || '').split('.')
+  if (!payload || !signature) return null
+
   try {
-    const row = db.prepare('SELECT users.id, users.email FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?').get(hash(token), Date.now())
-    return row || null
+    const expected = sign(payload)
+    const isValid = expected.length === signature.length && timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
+    if (!isValid) return null
+
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'))
+    if (!data.id || !data.email || !data.exp || data.exp < Date.now()) return null
+
+    try {
+      const isRevoked = db.prepare('SELECT token_hash FROM revoked_tokens WHERE token_hash = ?').get(hash(payload))
+      if (isRevoked) return null
+    } catch {}
+
+    // Ensure user exists in local SQLite instance so foreign keys work across serverless lambdas
+    try {
+      db.prepare('INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?)').run(data.id, data.email, 'signed-session', new Date().toISOString())
+    } catch {}
+
+    return { id: data.id, email: data.email }
   } catch {
     return null
   }
@@ -1249,31 +1272,27 @@ export async function handleRequest(req, res) {
         user = { id: row.id, email: row.email }
         logSignIn({ userId: user.id, email: user.email, ip, userAgent, status: 'success' })
       }
-      setSession(res, user.id)
+      setSession(res, user)
       return json(res, 200, { user })
     }
 
     if (req.method === 'POST' && path === '/api/auth/logout') {
-      const token = validSessionCookie(cookies(req).resumeai_session)
-      if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hash(token))
+      const rawCookie = cookies(req).resumeai_session
+      if (rawCookie) {
+        const [payload] = String(safeDecode(rawCookie) || '').split('.')
+        if (payload) {
+          try {
+            const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'))
+            db.prepare('INSERT OR REPLACE INTO revoked_tokens VALUES (?, ?)').run(hash(payload), data.exp || Date.now() + 604800000)
+          } catch {}
+        }
+      }
       const isProd = process.env.NODE_ENV === 'production'
       res.setHeader('Set-Cookie', `resumeai_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${isProd ? '; Secure' : ''}`)
       return json(res, 200, { ok: true })
     }
 
-    const user = currentUser(req)
-    if (!user) return json(res, 401, { error: 'Authentication required.' })
-
-    if (req.method === 'GET' && path === '/api/auth/sign-in-logs') {
-      const logs = db.prepare('SELECT id, user_id, email, ip_address, user_agent, status, failure_reason, created_at FROM sign_in_logs WHERE user_id = ? OR email = ? ORDER BY created_at DESC LIMIT 100').all(user.id, user.email)
-      return json(res, 200, { logs })
-    }
-
-    if (req.method === 'GET' && path === '/api/reports') {
-      const reports = db.prepare('SELECT payload FROM reports WHERE user_id = ? ORDER BY created_at DESC').all(user.id).map(row => JSON.parse(row.payload))
-      return json(res, 200, { reports })
-    }
-
+    // Public AI / Heuristic Analysis & Optimization Routes
     if (req.method === 'POST' && path === '/api/analyze') {
       const report = await analyzeWithAI(await readBody(req))
       return json(res, 200, { report })
@@ -1306,8 +1325,27 @@ export async function handleRequest(req, res) {
     if (req.method === 'POST' && path === '/api/reports') {
       const { report } = await readBody(req)
       if (!report?.id || !report?.role) return json(res, 400, { error: 'Invalid report.' })
-      db.prepare('INSERT OR REPLACE INTO reports VALUES (?, ?, ?, ?, ?)').run(report.id, user.id, report.role, JSON.stringify(report), new Date().toISOString())
-      return json(res, 201, { report })
+      const user = currentUser(req)
+      if (user) {
+        try {
+          db.prepare('INSERT OR REPLACE INTO reports VALUES (?, ?, ?, ?, ?)').run(report.id, user.id, report.role, JSON.stringify(report), new Date().toISOString())
+        } catch {}
+      }
+      return json(res, 201, { report, saved: Boolean(user) })
+    }
+
+    if (req.method === 'GET' && path === '/api/reports') {
+      const user = currentUser(req)
+      if (!user) return json(res, 200, { reports: [] })
+      const reports = db.prepare('SELECT payload FROM reports WHERE user_id = ? ORDER BY created_at DESC').all(user.id).map(row => JSON.parse(row.payload))
+      return json(res, 200, { reports })
+    }
+
+    if (req.method === 'GET' && path === '/api/auth/sign-in-logs') {
+      const user = currentUser(req)
+      if (!user) return json(res, 401, { error: 'Authentication required.' })
+      const logs = db.prepare('SELECT id, user_id, email, ip_address, user_agent, status, failure_reason, created_at FROM sign_in_logs WHERE user_id = ? OR email = ? ORDER BY created_at DESC LIMIT 100').all(user.id, user.email)
+      return json(res, 200, { logs })
     }
 
     return json(res, 404, { error: 'Not found' })

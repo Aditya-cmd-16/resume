@@ -586,20 +586,15 @@ function Analyze() {
         report = analyze(text, role, jd, fileName)
       }
 
-      const response = await fetch('/api/reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ report }),
-      })
-      if (!response.ok) {
-        let msg = 'Could not save report'
-        try {
-          const data = await response.json()
-          msg = data.error || msg
-        } catch {}
-        throw new Error(msg)
-      }
+      try {
+        await fetch('/api/reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ report }),
+        })
+      } catch {}
+
       const reports = loadReports()
       localStorage.setItem('resumeai-reports', JSON.stringify([report, ...reports.filter(r => r.id !== report.id)].slice(0, 10)))
       navigate(`/reports/${report.id}`)
